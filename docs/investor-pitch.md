@@ -26,4 +26,4 @@
 | **Where are the limits?** | Company and person coverage depends on Crustdata and the account’s entitlements. Repeated model opinions cannot supply an independent witness. Candidate checks require consent. The hosted ledger is shared, so the proposed pilot uses public company information. |
 | **What is the next milestone?** | Two introductions, three supplier claims per team. Compare elapsed reviewer time, claims the team can defend and cases requiring another source. Then ask whether the buyer would pay to use it on the next renewal. |
 
-[Buyer pitch and feature inventory](sales-guide.md) · [Provider rehearsal](rehearsal.md) · [Open a live investigation](https://counterparty-939419364980.asia-south1.run.app/workspace.html#live)
+[Hinglish pitch aur team guide](investor-pitch-hinglish.md) · [Buyer pitch and feature inventory](sales-guide.md) · [Provider rehearsal](rehearsal.md) · [Open a live investigation](https://counterparty-939419364980.asia-south1.run.app/workspace.html#live)
