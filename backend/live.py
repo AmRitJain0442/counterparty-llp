@@ -12,6 +12,7 @@ from .findings import interpret
 from .estate import estate_evidence
 from .destination import screen_destination
 from .progress import report
+from .vendor import vendor_records
 
 
 def collect_live(desk, subject, consent=False, inputs=None):
@@ -94,6 +95,14 @@ def collect_live(desk, subject, consent=False, inputs=None):
     result["evidence"].extend(interpreted["evidence"])
     result["steps"].extend(step for step in interpreted["steps"] if step not in result["steps"])
     result["signals"].extend(interpreted["signals"])
+    result["proposition"] = interpreted.get("proposition")
+    if desk == "payment" and len(matches) == 1:
+        cards = vendor_records(safe, company, raw["evidence"])
+        if cards:
+            result["evidence"].extend(cards)
+            result["proposition"] = cards[0]["claim"]
+            result["signals"].extend({"type": "claim_observation", "claim": c["claim"],
+                                      "evidence_id": c["id"]} for c in cards)
     result.update(mode="live", subject=subject, consent=consent)
     if person and consent is not True:
         result['signals'].append(dict(type='consent_required', provider='crustdata', operation='person_enrich', status='skipped'))

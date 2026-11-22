@@ -1,4 +1,4 @@
-﻿"""Apply deterministic claim-level evidence gates before a partner finding."""
+"""Apply deterministic claim-level evidence gates before a partner finding."""
 from .demo import CASES
 
 
@@ -15,6 +15,15 @@ def adjudicate(desk, raw):
             verdicts = {"payment":"HELD", "candidate":"FAILED", "estate":"KILLED" if killed else "REQUEST FOR EXPLANATION",
                         "company":"SIGNED"}
             return {"verdict":verdicts[desk], "summary":CASES[desk][3]}
+    claim = raw.get("proposition")
+    if desk == "payment" and claim:
+        cited = {s.get("evidence_id") for s in raw.get("signals", []) if
+                 s.get("type") == "claim_observation" and s.get("claim") == claim}
+        sources = {c.get("source") for c in raw.get("evidence", []) if
+                   c.get("id") in cited and c.get("claim") == claim
+                   and c.get("label") == "Vendor domain cross-check" and c.get("mode") == "LIVE"}
+        if sources >= {"Crustdata", "Brønnøysund"}:
+            return {"verdict": "HELD", "summary": claim + " Confirm the request by calling the number on file."}
     unresolved = any(s.get("status") == "unresolved" for s in raw.get("steps", []))
     if unresolved:
         return {"verdict":"IDENTITY REVIEW", "summary":"An identifier could not be tied to the subject. Review the source records before relying on this case."}

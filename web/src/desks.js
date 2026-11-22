@@ -15,6 +15,7 @@ export const DESKS = [
       { key: 'domain', label: 'Vendor domain', placeholder: 'vendor.example' },
       { key: 'sender_domain', label: 'Domain the email came from', placeholder: 'vendor-billing.example' },
       { key: 'person_url', label: 'Contact profile URL', placeholder: 'https://…', consent: true },
+      { key: 'orgnr', label: 'Vendor registry number (Norway)', placeholder: '9 digits' },
       { key: 'ifsc', label: 'New bank IFSC', placeholder: 'ABCD0123456' },
     ],
     consentFor: ['person_url'],
