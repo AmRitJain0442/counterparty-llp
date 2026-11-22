@@ -1,15 +1,23 @@
+import io
 import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from backend.adjudication import adjudicate
 from backend.findings import interpret
+from backend import providers
 
 
 AS_OF = "2026-10-15T11:00:00+00:00"
 PRIVATE = "PRIVATE-DO-NOT-PUBLISH"
 PROFILE = "https://www.linkedin.com/in/private-person/"
 INPUTS = {"domain": "vendor.example", "cik": "42", "person_url": PROFILE}
+
+
+@pytest.fixture
+def adjudicate():
+    from backend.adjudication import adjudicate
+    return adjudicate
 
 
 def row(op, data, *, provider="crustdata", status="ok", as_of=AS_OF):
@@ -255,7 +263,7 @@ def registry(**updates):
                          "hjemmeside": "https://www.vendor.example", **updates}, provider="brreg")
 
 
-def test_independent_vendor_records_pass_the_live_callback_gate():
+def test_independent_vendor_records_pass_the_live_callback_gate(adjudicate):
     result = run("payment", company(), registry(), rdap(), person(profile(81, [VENDOR], [NEXT])),
                  inputs={**PAY, "orgnr": "123456789"})
     assert adjudicate("payment", result)["verdict"] == "HELD"
@@ -272,7 +280,7 @@ def test_independent_vendor_records_pass_the_live_callback_gate():
     registry(hjemmeside="other.example"), row("brreg", None, provider="brreg", status="http_503"),
     row("brreg", registry()["data"], provider="crustdata"),
 ])
-def test_unrelated_payment_facts_never_replace_a_missing_domain_witness(registry_row):
+def test_unrelated_payment_facts_never_replace_a_missing_domain_witness(registry_row, adjudicate):
     result = run("payment", company(), registry_row, rdap(), person(profile(81, [VENDOR], [NEXT])),
                  inputs={**PAY, "orgnr": "123456789"})
     assert adjudicate("payment", result)["verdict"] != "HELD"
@@ -280,14 +288,14 @@ def test_unrelated_payment_facts_never_replace_a_missing_domain_witness(registry
 
 
 @pytest.mark.parametrize("sender", ["vendor.example", "billing.vendor.example", "alternate.example"])
-def test_vendor_and_a_known_alias_or_subdomain_cannot_trigger_callback(sender):
+def test_vendor_and_a_known_alias_or_subdomain_cannot_trigger_callback(sender, adjudicate):
     identified = company()
     identified["data"][0]["matches"][0]["company_data"]["basic_info"]["all_domains"] = ["alternate.example"]
     result = run("payment", identified, registry(), inputs={**PAY, "sender_domain": sender, "orgnr": "123456789"})
     assert adjudicate("payment", result)["verdict"] != "HELD"
 
 
-def test_stale_profile_remains_historical_context_and_cannot_vote():
+def test_stale_profile_remains_historical_context_and_cannot_vote(adjudicate):
     old = person(profile(81, [VENDOR], [NEXT], updated="2026-08-12"))
     result = run("payment", company(), old, rdap(), inputs=PAY)
     assert card(result, "Next-employer start")["observed_on"] == "2026-08-08"
@@ -296,7 +304,7 @@ def test_stale_profile_remains_historical_context_and_cannot_vote():
     assert any(s["name"] == "Profile freshness" and s["status"] == "unknown" for s in result["steps"])
 
 
-def test_person_identify_and_enrich_must_agree_on_the_person_id():
+def test_person_identify_and_enrich_must_agree_on_the_person_id(adjudicate):
     identity = person({"crustdata_person_id": 99})
     identity["operation"] = "person_identify"
     result = run("payment", company(), identity, person(profile(81, [VENDOR], [NEXT])), inputs=PAY)
@@ -304,7 +312,7 @@ def test_person_identify_and_enrich_must_agree_on_the_person_id():
     assert all(e["label"] != "Next-employer start" for e in result["evidence"])
 
 
-def test_company_estimates_and_filing_index_are_independent_facts():
+def test_company_estimates_and_filing_index_are_independent_facts(adjudicate):
     headcount = {"by_function_timeseries": {"CURRENT_FUNCTION": {"Finance": [
         {"date": "2026-09-30", "employee_count": 19}, {"date": "2026-06-30", "employee_count": 27},
         {"date": "2027-01-01", "employee_count": 9040}]}}}
@@ -336,9 +344,102 @@ def test_executive_start_dates_use_embedded_enrichment_role_schema_and_suppress_
     assert all(e["label"] != "Executive role starts" for e in thin["evidence"])
 
 
-def test_candidate_date_and_staffing_checks_leave_the_employment_decision_with_the_reviewer():
+def test_candidate_date_and_staffing_checks_leave_the_employment_decision_with_the_reviewer(adjudicate):
     result = run("candidate", company(), person(profile(81, [VENDOR])), engineering_counts(), submissions(),
                  inputs={**INPUTS, "claim": "Led 40 engineers in Q3 2023"})
     assert result["proposition"] == card(result, "Claimed headcount")["claim"]
     assert {s["provider"] for s in result["signals"]} == {"crustdata"}
     assert adjudicate("candidate", result)["verdict"] == "INSUFFICIENT WITNESSES"
+
+
+def test_month_precision_survives_projection():
+    result = run("payment", company(), person(profile(81, [VENDOR], [role(71, "2026-08")])), inputs=PAY)
+    movement = card(result, "Next-employer start")
+    assert movement["observed_from"] == "2026-08-01" and movement["observed_through"] == "2026-08-31"
+    assert "observed_on" not in movement
+
+
+def test_explicit_claim_for_another_employer_is_withheld():
+    claim = {"start_date": "2023", "end_date": "2025", "headcount": 40,
+             "department": "Engineering", "employer_domain": "other.example"}
+    result = run("candidate", company(), person(profile(81, [VENDOR])), engineering_counts(),
+                 inputs={**INPUTS, "claim": claim})
+    assert all(e["label"] not in ("Claimed headcount", "Claimed employment dates") for e in result["evidence"])
+    assert any(s["name"] == "Candidate claim" and s["status"] == "unknown" for s in result["steps"])
+
+
+def test_misaligned_sec_index_cannot_attach_another_rows_date():
+    sec = submissions()
+    sec["data"]["filings"]["recent"]["filingDate"].pop(3)
+    result = run("company", company(), sec)
+    assert all(e["source"] != "sec" for e in result["evidence"])
+
+
+@pytest.mark.parametrize("metadata", [{"status": "http_403"}, {"mode": "REPLAY"}, {"as_of": "unknown"}])
+def test_only_dated_live_successes_can_supply_observations(metadata):
+    sec = {**submissions(), **metadata}
+    result = run("company", company(), sec, signals=[{"type": "claim_observation", "claim": PRIVATE}])
+    assert all(e["source"] != "sec" for e in result["evidence"])
+    assert not result["signals"] and PRIVATE not in json.dumps(result)
+
+
+@pytest.mark.parametrize("charge,expected", [("0", 0), ("1.75", 1.75), (None, None), ("NaN", None)])
+def test_billing_is_separate_from_witness_count(charge, expected):
+    result = interpret("payment", "Vendor", {}, {"credits": [{"actual": charge}]})
+    assert result["credits"] == expected and not result["signals"]
+
+
+@pytest.mark.parametrize("ids,days_old,expected", [(["21"], 2, True), (["21", "42"], 2, False), (["21"], 180, False)])
+def test_forward_review_needs_bound_fresh_interim_role_and_recent_issuer_filing(ids, days_old, expected):
+    today = datetime.now(timezone.utc).date()
+    start = str(today - timedelta(days=16))
+    filed = str(today - timedelta(days=14))
+    refreshed = str(today - timedelta(days=days_old))
+    officer = {"crustdata_person_id": 81, "updated_at": refreshed, "basic_profile": {"name": PRIVATE},
+               "experience": {"employment_details": {"current": [
+                   {"employer_company_id": ids, "employee_title": "Acting Chief Financial Officer",
+                    "employee_start_date": start}]}}}
+    enrich = company("company_enrich", people={"cxos": [officer]})
+    sec = submissions(filings={"recent": {"form": ["8-K"], "items": ["5.02,9.01"], "filingDate": [filed]}})
+    records = [{**r, "as_of": str(today)} for r in (company(), enrich, sec)]
+    result = run("company", *records)
+    assert ("forecast" in result) is expected
+    if expected:
+        assert result["forecast"]["filing_on"] == filed
+        assert result["forecast"]["due"] > str(today)
+        assert card(result, "Interim finance appointment")["observed_on"] == start
+    assert PRIVATE not in json.dumps(result)
+
+
+def test_bank_validation_minimizes_private_account_identifiers_and_never_votes():
+    iban = "DE89370400440532013000"
+    data = {"iban": iban, "valid": True, "bankData": {"accountNumber": PRIVATE}, "messages": [PRIVATE]}
+    lookup = row("openiban", data, provider="openiban")
+    lookup["source"] = "https://openiban.com/validate/" + iban
+    result = run("payment", lookup, inputs={"iban": iban})
+    assert "passed" in card(result, "IBAN validation")["detail"]
+    assert iban not in json.dumps(result) and PRIVATE not in json.dumps(result)
+    assert result["signals"] == []
+
+
+def test_interpret_accepts_the_transport_output_directly(monkeypatch):
+    class Response(io.BytesIO):
+        headers = {}
+        code = 200
+
+    class PublicIndex:
+        def open(self, request, timeout):
+            assert request.full_url == "https://data.sec.gov/submissions/CIK0000000042.json"
+            body = {"name": "Vendor Inc.", "cik": "0000000042", "tickers": ["VEND"], "filings": {"recent": {
+                "form": ["8-K"], "items": ["5.02,9.01"], "filingDate": ["2020-05-06"], "reportDate": ["2020-05-01"]}}}
+            return Response(json.dumps(body).encode())
+
+    monkeypatch.setenv("SEC_USER_AGENT", "test")
+    monkeypatch.setattr(providers, "build_opener", lambda *_: PublicIndex())
+    monkeypatch.setattr(providers, "throttle", lambda *_: None)
+    inputs = {"cik": "42"}
+    raw = providers.run_live("company", "", inputs=inputs)
+    result = interpret("company", "VEND", inputs, raw)
+    filing = card(result, "8-K Item 5.02")
+    assert filing["observed_on"] == "2020-05-06" and filing["as_of"] == raw["evidence"][0]["as_of"]
+    assert result["signals"][0]["evidence_id"] == filing["id"] and result["proposition"] == filing["claim"]
