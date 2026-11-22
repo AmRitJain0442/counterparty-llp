@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 74" role="img" aria-labelledby="title">
+  <title id="title">Counterparty LLP</title>
+  <g transform="translate(5 5)" fill="none" stroke="#ff7148" stroke-width="4" stroke-linejoin="miter">
+    <path d="M38 14H25L12 32l13 18h13"/><path opacity=".66" d="M26 14h13l13 18-13 18H26"/><path d="m24 32 8-11 8 11-8 11z"/>
+  </g>
+  <text x="82" y="50" fill="#eee5cd" font-family="Arial, sans-serif" font-weight="700" letter-spacing="-1.7" font-size="37">Counterparty</text>
+  <text x="314" y="47" fill="#ff7148" font-family="monospace" letter-spacing="2" font-size="17">LLP</text>
+</svg>
