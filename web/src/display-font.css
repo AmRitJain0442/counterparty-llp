@@ -1,0 +1,9 @@
+@font-face {
+  font-family: Doto;
+  src: url('/fonts/doto-800-round-latin.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+}
+
+:root { --display-font: Doto, ui-monospace, monospace; }
