@@ -39,6 +39,8 @@ The Windows launcher also reads the current user's DPAPI-protected Crustdata tok
 | POST /api/cases/stream | Same investigation with newline-delimited progress and a final case |
 | GET /api/cases | Ledger in reverse creation order |
 | GET /api/cases/{id} | Stored evidence, decision, cost and receipt |
+| GET /api/capabilities | Current account balance, prices and entitlements |
+| GET /api/cases/{id}/receipt | Verify the stored decision commitment |
 | GET /api/health | Service health |
 | GET /docs | Interactive API schema |
 

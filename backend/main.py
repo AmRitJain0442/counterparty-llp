@@ -15,7 +15,7 @@ from .account import capabilities
 from .adjudication import adjudicate
 from .demo import build_demo
 from .drafting import draft_note
-from .receipts import create_receipt
+from .receipts import ReceiptError, create_receipt, verify_receipt
 from .watch import router as watch_router
 from . import progress
 from .live import collect_live
@@ -81,6 +81,16 @@ def detail(case_id: str):
     return case
 
 
+@app.get("/api/cases/{case_id}/receipt")
+def check_receipt(case_id: str):
+    case = detail(case_id)
+    try:
+        status = verify_receipt(case, case.get("receipt_record"))
+    except ReceiptError as exc:
+        raise HTTPException(409, "Receipt could not be verified") from exc
+    return {"id": case_id, "digest": case["receipt"], "status": status}
+
+
 @app.post("/api/cases", status_code=201)
 def investigate(intake: Intake):
     subject = intake.subject.strip()
@@ -118,7 +128,7 @@ def investigate(intake: Intake):
     progress.report("Ledger", "running", "Committing the evidence receipt")
     receipt = create_receipt(case)
     case["receipt_record"] = receipt
-    case["receipt"] = receipt.get("digest") or receipt.get("commitment") or str(receipt.get("sha256", ""))
+    case["receipt"] = receipt["digest"]
     save_case(case)
     return case
 
