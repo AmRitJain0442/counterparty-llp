@@ -390,7 +390,7 @@ def test_billing_is_separate_from_witness_count(charge, expected):
 
 
 @pytest.mark.parametrize("ids,days_old,expected", [(["21"], 2, True), (["21", "42"], 2, False), (["21"], 180, False)])
-def test_forward_review_needs_bound_fresh_interim_role_and_recent_issuer_filing(ids, days_old, expected):
+def test_forward_review_needs_bound_fresh_interim_role_and_recent_issuer_filing(ids, days_old, expected, adjudicate):
     today = datetime.now(timezone.utc).date()
     start = str(today - timedelta(days=16))
     filed = str(today - timedelta(days=14))
@@ -405,6 +405,7 @@ def test_forward_review_needs_bound_fresh_interim_role_and_recent_issuer_filing(
     result = run("company", *records)
     assert ("forecast" in result) is expected
     if expected:
+        assert adjudicate("company", result)["verdict"] == "FORECAST FOR REVIEW"
         assert result["forecast"]["filing_on"] == filed
         assert result["forecast"]["due"] > str(today)
         assert card(result, "Interim finance appointment")["observed_on"] == start
@@ -443,3 +444,44 @@ def test_interpret_accepts_the_transport_output_directly(monkeypatch):
     filing = card(result, "8-K Item 5.02")
     assert filing["observed_on"] == "2020-05-06" and filing["as_of"] == raw["evidence"][0]["as_of"]
     assert result["signals"][0]["evidence_id"] == filing["id"] and result["proposition"] == filing["claim"]
+
+
+def test_function_headcount_uses_the_returned_function_without_echoing_arbitrary_claim_text():
+    enriched = company("company_enrich", headcount={"by_function_timeseries": {"CURRENT_FUNCTION": {
+        "Human Resources": [{"date": "2023-05-01", "employee_count": 16}]}}})
+    scope = {"start_date": "2023", "end_date": "2023", "headcount": 30, "department": "human resources"}
+    result = run("candidate", company(), enriched, inputs={**INPUTS, "claim": scope})
+    assert "16 profiles" in card(result, "Claimed headcount")["detail"]
+    scope["department"] = PRIVATE
+    unknown = run("candidate", company(), enriched, inputs={**INPUTS, "claim": scope})
+    assert PRIVATE not in json.dumps(unknown)
+    assert all(e["label"] != "Claimed headcount" for e in unknown["evidence"])
+
+
+def test_negative_team_statement_is_left_for_review():
+    result = run("candidate", company(), engineering_counts(), inputs={**INPUTS, "claim": "Never led 40 engineers in Q3 2023"})
+    assert all(e["label"] != "Claimed headcount" for e in result["evidence"])
+    assert not result["signals"]
+
+
+def test_live_candidate_intake_uses_the_claim_and_its_actual_witness(monkeypatch, adjudicate):
+    from backend import live
+
+    candidate = profile(81, [VENDOR])
+    identity = {**person({"crustdata_person_id": 81}), "operation": "person_identify"}
+    records = {r["operation"]: r for r in (
+        company(), engineering_counts(), identity, person(candidate), row("person_search", {"profiles": []}))}
+
+    def collect(desk, subject, consent, lane):
+        assert consent is True
+        selected = [records[op] for op in lane["crustdata"]]
+        return dict(evidence=selected, signals=[], steps=[], credits=[], flows=[])
+
+    monkeypatch.setattr(live, "run_live", collect)
+    inputs = {"domain": "vendor.example", "person_url": PROFILE, "claim": "Led 40 engineers in Q3 2023"}
+    result = live.collect_live("candidate", "Candidate", consent=True, inputs=inputs)
+    count = card(result, "Claimed headcount")
+    assert "40" in count["detail"] and "11 profiles" in count["detail"] and count["observed_on"] == "2023-09-30"
+    assert result["proposition"] == count["claim"]
+    assert any(s["evidence_id"] == count["id"] and s["provider"] == "crustdata" for s in result["signals"])
+    assert adjudicate("candidate", result)["verdict"] == "INSUFFICIENT WITNESSES"

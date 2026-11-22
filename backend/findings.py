@@ -410,8 +410,12 @@ def _vendor_domain(review, inputs, domains):
         return
     org = inputs.get("orgnr")
     record = _dict(registry.get("data"))
-    if (not isinstance(org, str) or not re.fullmatch(r"[0-9]{9}", org)
-            or record.get("organisasjonsnummer") != org or not _domain(record.get("hjemmeside"))):
+    if not isinstance(org, str) or not re.fullmatch(r"[0-9]{9}", org):
+        return
+    if record.get("organisasjonsnummer") != org:
+        review.step("Vendor registry identity", "unresolved", "The returned registry number differs from the intake.")
+        return
+    if not _domain(record.get("hjemmeside")) or not _issuer_name(record.get("navn")):
         return
     _, company = _match(identify, "company")
     basic = _dict(company.get("basic_info"))
@@ -429,12 +433,14 @@ def _vendor_domain(review, inputs, domains):
             {**registry, "source": f"{SOURCES['brreg'][1]}/{org}"}]
     cards = vendor_records({"domain": vendor, "sender_domain": sender, "orgnr": org},
                            {"basic_info": {"name": basic["name"], "primary_domain": company_domain}}, rows)
+    if not cards:
+        review.step("Vendor registry identity", "unresolved", "The registry and company profile could not confirm the same vendor domain.")
+        return
     for card, row in zip(cards, rows):
         card.update(provider=row["provider"], status="ok", operation=row["operation"])
         review.evidence.append(card)
         review.observe(card, card["claim"])
-    if cards:
-        review.proposition = cards[0]["claim"]
+    review.proposition = cards[0]["claim"]
 
 
 @dataclass(frozen=True)
@@ -473,7 +479,7 @@ def _candidate_claim(inputs, domains, company_name):
     if isinstance(claim, str):
         ranges = DATE_RANGE.findall(claim)
         teams = TEAM.findall(claim)
-        if len(ranges) > 1 or len(teams) > 1:
+        if len(ranges) > 1 or len(teams) > 1 or (teams and re.search(r"\b(?:not|never|didn['’]t)\b", claim, re.I)):
             return None
         if ranges and start is None and end is None:
             start, end = ranges[0]
@@ -498,11 +504,9 @@ def _candidate_claim(inputs, domains, company_name):
     if department is not None and not isinstance(department, str):
         return None
     group = _name(department)
-    if group and group not in FUNCTIONS and group not in {
-        "employee", "employees", "people", "staff", "direct report", "direct reports", "total"
-    }:
-        return None
-    return _Claim(window, count, FUNCTIONS.get(group))
+    if group in {"employee", "employees", "people", "staff", "direct report", "direct reports", "total"}:
+        group = ""
+    return _Claim(window, count, FUNCTIONS.get(group, group) or None)
 
 
 def _ranges(roles, cid, domains, cutoff):
@@ -603,7 +607,7 @@ def _headcounts(company, department, cutoff):
 
 def _claim_headcount(review, company, claim):
     row = review.one("company_enrich")
-    population = claim.department or "whole-company"
+    population = FUNCTIONS.get(_name(claim.department), "claimed function") if claim.department else "whole-company"
     count = claim.headcount
     claimed = str(count) if count >= MIN_GROUP else "fewer than five"
     detail = f"The claim lists {claimed} staff. "
