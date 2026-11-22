@@ -63,35 +63,52 @@ def run_council(desk, evidence, verdict, emit, mode):
             selected = [r for r in rows if r not in material]
         refs = list(dict.fromkeys(r['id'] for r in selected))
         status = 'complete'
+        assessment = None
         if key.startswith(('analyst_', 'challenger_')) or key == 'partner':
             upstream = [reports[d] for d in deps]
             if any(r['status'] != 'complete' for r in upstream):
                 detail, status = 'Required council output unavailable; review blocked.', 'blocked'
             elif replay:
                 observations = '; '.join(str(r.get('detail') or r.get('label'))[:400] for r in selected)
-                detail = f'Replay : {agent["task"]}. Curated observations: {observations}. '
-                detail += 'Review inputs: ' + ', '.join(deps) + '. Deterministic verdict remains authoritative.'
+                detail = f'{agent["task"]}. Curated observations: {observations}. '
+                detail += 'Reviewed inputs from ' + ', '.join(agents[d]['name'] for d in deps) + '.'
+                assessment = 'rehearsal'
             else:
                 context = [dict(id=r['id'], label=r.get('label', ''),
                                 detail=r.get('detail', ''), as_of=r.get('as_of', ''),
                                 source=r.get('source', '')) for r in selected]
-                dependencies = [dict(label=f'Dependency {r["agent_id"]}', detail=r['detail'],
+                dependencies = [dict(label=f'Dependency {r["agent_id"]}', detail=f"{r.get('assessment') or 'Observation'}: {r['detail']}",
                                  source=', '.join(r['refs'])) for r in upstream]
                 context = [dict(label='Bounded assignment', detail=agent['task'], source='Council'), *dependencies, *context]
-                detail, status = draft_note(desk, context, verdict,
-                                           'partner' if key == 'partner' else 'counsel' if key.startswith('challenger') else 'analyst')
-                if not detail:
+                role = 'counsel' if key.startswith('challenger') else 'analyst'
+                review, status = draft_note(desk, context, verdict, 'partner' if key == 'partner' else role)
+                if review:
+                    detail, assessment, refs = review['note'], review['assessment'], review['refs']
+                else:
                     detail = f'Vertex note unavailable: {status}'
                     status = 'unavailable'
         elif key == 'authority':
-            detail = f'Authoritative deterministic adjudication: {verdict}'
+            detail = f'Evidence gate produced the proposed finding {verdict}.'
+        elif key == 'identity':
+            identity_rows = [r for r in material if 'ident' in r.get('label','').lower() or 'match' in r.get('label','').lower()]
+            detail = ('Identity exhibits: ' + ', '.join(r['label'] for r in identity_rows)
+                      if identity_rows else 'No separate identity exhibit. Check the identity binding in the case records.')
+        elif key == 'dates':
+            dates = sorted({str(r['as_of'])[:10] for r in selected})
+            detail = (f'Observation dates range from {dates[0]} to {dates[-1]}.' if dates
+                      else 'No source card carries an observation date.')
+        elif key == 'gaps':
+            detail = ('Unavailable source cards: ' + ', '.join(r.get('label','Unknown') for r in selected)
+                      if selected else 'All supplied source cards were available.')
+        elif key == 'material':
+            detail = 'Available source cards: ' + (', '.join(r.get('label','Unknown') for r in selected) or 'none')
         elif key == 'handoff':
-            detail = 'Review outputs: ' + ', '.join(deps)
+            detail = 'Filed work from ' + ', '.join(agents[d]['name'] for d in deps) + '.'
         else:
             detail = f'{agent["task"]}: {len(selected)} observations; sources: ' + ', '.join(
                 dict.fromkeys(str(r.get('source', 'unknown')) for r in selected))
         return dict(agent_id=key, name=agent['name'], group=agent['group'], status=status,
-                    detail=detail, refs=refs, depends_on=list(deps))
+                    detail=detail, refs=refs, assessment=assessment, depends_on=list(deps))
 
     with ThreadPoolExecutor(max_workers=5) as pool:
         for stage in _STAGES:

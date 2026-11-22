@@ -41,7 +41,8 @@ def run_live(desk, subject, consent=False, inputs=None):
     result = dict(evidence=[], steps=[], credits=[], flows=[], signals=[])
 
     def call(provider, operation, url, payload=None, headers=None, unavailable=False):
-        report(operation, 'running', f'Collecting {provider} evidence')
+        owner = 'identity' if operation.endswith('_identify') else 'material' if provider == 'crustdata' else 'sources'
+        report(operation, 'running', f'Collecting {provider} evidence', collection_agent=owner)
         eid = 'e' + str(len(result['evidence']) + 1)
         status, data, used = 'unavailable', None, None
         if not unavailable:
@@ -79,7 +80,7 @@ def run_live(desk, subject, consent=False, inputs=None):
             result['credits'].append(dict(evidence_id=eid, actual=used))
         kind = 'evidence_available' if status == 'ok' else ('provider_unavailable' if status == 'unavailable' else 'provider_failure')
         result['signals'].append(dict(type=kind, provider=provider, operation=operation, evidence_id=eid, status=status))
-        report(operation, status, f'{provider} collection finished')
+        report(operation, status, f'{provider} collection finished', collection_agent=owner)
         return data
 
     key = os.getenv('CRUSTDATA_API_KEY')

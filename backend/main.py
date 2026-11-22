@@ -140,9 +140,11 @@ def investigate(intake: Intake):
     if intake.mode == "live" and intake.desk == "candidate" and not intake.consent:
         raise HTTPException(422, "Candidate consent is required")
     if intake.mode == "live":
-        raw = collect_live(intake.desk, subject, intake.consent, intake.inputs)
+        with progress.record_collection() as collections:
+            raw = collect_live(intake.desk, subject, intake.consent, intake.inputs)
     else:
         raw = build_demo(intake.desk)
+        collections = []
     progress.report("Opposing counsel", "running", "Checking evidence and alternative explanations")
     ruling = adjudicate(intake.desk, raw)
     case = {
@@ -169,6 +171,7 @@ def investigate(intake: Intake):
         progress.send(event)
 
     reports = run_council(intake.desk, case["evidence"], ruling["verdict"], observe, intake.mode)
+    case["collection_events"] = collections
     case["swarm_events"] = trace
     case["swarm_reports"] = reports
     case["steps"].extend({k: report[k] for k in ("name", "status", "detail")} for report in reports)
@@ -178,9 +181,13 @@ def investigate(intake: Intake):
         partner = by_id["partner"]
         if partner["status"] == "complete":
             case["draft"] = partner["detail"]
-        elif ruling["verdict"] in {"HELD", "FORECAST FOR REVIEW", "REQUEST FOR EXPLANATION", "FAILED"}:
+        reviewers = [r for r in reports if r["agent_id"].startswith(("analyst_", "challenger_")) or r["agent_id"] == "partner"]
+        referrals = [r["name"] for r in reviewers if r.get("assessment") == "needs_evidence" or r["status"] != "complete"]
+        case["council_decision"] = {"proposed_verdict": ruling["verdict"], "referred_by": referrals,
+                                    "disposition": "further review" if referrals else "review complete"}
+        if referrals and ruling["verdict"] in {"HELD", "FORECAST FOR REVIEW", "REQUEST FOR EXPLANATION", "FAILED", "KILLED"}:
             case["verdict"] = "PARTNER REVIEW"
-            case["summary"] = "The council could not complete its challenge and synthesis. A reviewer must assess the proposed finding."
+            case["summary"] = "The council referred the proposed finding for further evidence. Review the flagged agent reports before acting."
     progress.report("Ledger", "running", "Committing the evidence receipt")
     if raw.get("forecast"):
         case["forecast"] = raw["forecast"]

@@ -62,3 +62,24 @@ def test_review_keeps_original_commitment_valid(client):
     assert response.status_code == 201
     assert client.get(url + "/reviews").json() == [response.json()]
     assert client.get(url + "/receipt").json()["digest"] == case["receipt"]
+
+
+@pytest.mark.parametrize("assessment,expected", [("ready", "FORECAST FOR REVIEW"), ("needs_evidence", "PARTNER REVIEW")])
+def test_live_challenge_can_refer_a_proposed_finding(client, monkeypatch, assessment, expected):
+    from backend import swarm
+    monkeypatch.setattr(main, "collect_live", lambda *args: {
+        "subject": "Example", "evidence": [{"id":"card", "label":"Filing", "detail":"Dated filing", "source":"Registry"}],
+        "steps": [], "flows": [], "credits": 0,
+    })
+    monkeypatch.setattr(main, "adjudicate", lambda *a: {"verdict":"FORECAST FOR REVIEW", "summary":"Reviewable finding"})
+    def review(desk, evidence, verdict, role):
+        choice = assessment if role == "counsel" else "ready"
+        return {"note": "Check the dated filing.", "assessment": choice, "refs": ["card"]}, "complete"
+    monkeypatch.setattr(swarm, "draft_note", review)
+    response = client.post("/api/cases", json={"desk":"company", "subject":"Example", "mode":"live"})
+    assert response.status_code == 201
+    case = response.json()
+    assert case["verdict"] == expected
+    referrals = case["council_decision"]["referred_by"]
+    assert referrals == (["Scope challenger", "Timing challenger"] if assessment == "needs_evidence" else [])
+    assert client.get("/api/cases/" + case["id"] + "/receipt").status_code == 200

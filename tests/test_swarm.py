@@ -33,7 +33,7 @@ def test_live_parallel_fanout_and_context(monkeypatch):
             analyst.wait(timeout=3)
         elif 'Challenge' in task:
             challenger.wait(timeout=3)
-        return task, 'complete'
+        return {'note':task, 'assessment':'ready', 'refs':['e1']}, 'complete'
 
     monkeypatch.setattr(swarm, 'draft_note', note)
     reports = swarm.run_council('payment', ROWS, 'HELD', lambda e: None, 'live')
