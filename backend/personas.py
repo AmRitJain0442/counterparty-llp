@@ -181,14 +181,12 @@ SPECIALISTS = {
 
 _ISO = re.compile(r'\b(\d{4})-(\d{2})-(\d{2})\b')
 _IDENT = re.compile(r'\b\d{6,}\b|\b[A-Z]{4}0[A-Z0-9]{6}\b|\b[A-Z0-9]{20}\b|\b(?:CIK|LEI|orgnr)\W+\w+', re.I)
-_NUM = re.compile(r'(?<![\w.])(\d{1,6})(?![\w.])')
 _QUARTER = re.compile(r'\bQ([1-4])\s*(20\d{2})\b')
 _BAD = re.compile(r'\b(no |not |fails?|failed|differs?|unavailable|suppressed|revoked|killed|predat\w+|'
                   r'unresolved|without|contradict\w*)', re.I)
 _GENERIC = re.compile(r'(review the source|retrieved\.?$|no company matched|returned \w+\. this source contributes no)', re.I)
 _REGISTRY = re.compile(r'\b(registry|register|brreg|br[øo]nn[øo]ysund|gleif|edgar|sec|companies house|'
                        r'ifsc|rdap|attestation|filing)\b', re.I)
-_ATTEST = re.compile(r'\b(attestation|signed|return)\b', re.I)
 _SELF = re.compile(r'\b(cv|consented|claims?)\b', re.I)
 _BOUNDARY = ('parent', 'subsidiary', 'unit', 'division', 'group', 'branch', 'cohort', 'holding',
              'legal entity', 'reporting unit', 'successor', 'board')
