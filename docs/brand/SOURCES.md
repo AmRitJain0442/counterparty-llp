@@ -1,0 +1,9 @@
+# Brand sources
+
+- **Crustdata:** `crustdata.svg` is the unmodified, percent-decoded SVG data URL embedded in the navigation home link (`data-framer-name="Crustdata-logo"`) on the official context/source page https://crustdata.com/ (retrieved 2026-11-22). Exact asset URL: the `data:image/svg+xml,` URL in that element's `background-image` attribute; it is embedded rather than served at a separate HTTP asset URL. Reproduce by fetching that page, selecting that element, and percent-decoding its background-image data URL. ViewBox: `0 0 161.45 32`. SHA-256: `7a76b5f977d2faca6adcdcdc3d397dced9fa60e3f373d2b3d034dff0c501e2e0`. XML parsed successfully; paths only, with no scripts, event handlers, external references, fonts, or linked resources. SVG namespace declarations are identifiers, not fetched dependencies. Brand ownership remains with Crustdata.
+- **Counterparty original mark:** repository source [`web/public/brand/mark.svg`](../../web/public/brand/mark.svg), introduced in commit `bd6ad21` ("Draw an original interlocking witness mark and firm wordmark"); original Counterparty artwork, not a Crustdata asset.
+- **Doto heading font:** repository license [`web/public/fonts/Doto-OFL.txt`](../../web/public/fonts/Doto-OFL.txt), copyright 2024 The Doto Project Authors; upstream https://github.com/oliverlalan/Doto; SIL Open Font License 1.1, https://openfontlicense.org/.
+
+## GitHub theme usage
+
+The official logo has a purple symbol and white lettering on transparency. It needs a controlled dark background in both light and dark GitHub themes. GitHub Markdown cannot reliably supply an image background through CSS. Do not display it directly against the light theme or recolor the official SVG. Use it within an already dark presentation surface, or obtain an official light-background variant and select official variants with a `<picture>` element and `prefers-color-scheme` sources. No additional artwork or altered variants are supplied here.
