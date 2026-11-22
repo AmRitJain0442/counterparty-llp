@@ -70,7 +70,9 @@ def test_sec_latest_filing_per_exact_item_retains_column_alignment_and_report_da
     assert PRIVATE not in json.dumps(result)
 
 
-@pytest.mark.parametrize("overrides", [{"cik": "43"}, {"name": "Vendor Subsidiary LLC"}, {"cik": None}])
+@pytest.mark.parametrize("overrides", [
+    {"cik": "43"}, {"name": "Vendor Subsidiary LLC"}, {"website": "https://unrelated.example/"}, {"cik": None},
+])
 def test_incompatible_issuer_identity_withholds_its_observations(overrides):
     result = run("company", company(), submissions(**overrides))
     assert all(e["source"] != "sec" for e in result["evidence"])
@@ -389,8 +391,12 @@ def test_billing_is_separate_from_witness_count(charge, expected):
     assert result["credits"] == expected and not result["signals"]
 
 
-@pytest.mark.parametrize("ids,days_old,expected", [(["21"], 2, True), (["21", "42"], 2, False), (["21"], 180, False)])
-def test_forward_review_needs_bound_fresh_interim_role_and_recent_issuer_filing(ids, days_old, expected, adjudicate):
+@pytest.mark.parametrize("ids,days_old,role_fields,expected", [
+    (["21"], 2, {}, True), (["21", "42"], 2, {}, False), (["21"], 180, {}, False),
+    (["21"], 2, {"employee_title": "Advisor to the Acting CFO"}, False),
+    (["21"], 2, {"employee_end_date": "2020-01-01"}, False),
+])
+def test_forward_review_needs_bound_fresh_interim_role_and_recent_issuer_filing(ids, days_old, role_fields, expected, adjudicate):
     today = datetime.now(timezone.utc).date()
     start = str(today - timedelta(days=16))
     filed = str(today - timedelta(days=14))
@@ -398,7 +404,7 @@ def test_forward_review_needs_bound_fresh_interim_role_and_recent_issuer_filing(
     officer = {"crustdata_person_id": 81, "updated_at": refreshed, "basic_profile": {"name": PRIVATE},
                "experience": {"employment_details": {"current": [
                    {"employer_company_id": ids, "employee_title": "Acting Chief Financial Officer",
-                    "employee_start_date": start}]}}}
+                    "employee_start_date": start, **role_fields}]}}}
     enrich = company("company_enrich", people={"cxos": [officer]})
     sec = submissions(filings={"recent": {"form": ["8-K"], "items": ["5.02,9.01"], "filingDate": [filed]}})
     records = [{**r, "as_of": str(today)} for r in (company(), enrich, sec)]

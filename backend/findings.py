@@ -218,8 +218,8 @@ def _filings(review, subject, inputs, company_name, domains):
     bound = _issuer_subject(sec, subject)
     if company_name:
         # A caller can supply both a real CIK and a real, unrelated domain.
-        websites = (_domain(sec.get("website")), _domain(sec.get("investorWebsite")))
-        same_company = company_name == _issuer_name(sec.get("name")) or bool(set(domains).intersection(websites))
+        website = _domain(sec.get("website"))
+        same_company = website in domains if website and domains else company_name == _issuer_name(sec.get("name"))
         bound = same_company and (bound or _issuer_name(subject) == company_name or _domain(subject) in domains)
     if not cik or cik != _cik(inputs.get("cik")) or not bound:
         review.step("SEC issuer identity", "unresolved", "The CIK and issuer could not be tied to this company.")
@@ -676,6 +676,10 @@ def _workforce(review, company):
         review.observe(card, observation, primary=True)
 
 
+INTERIM_CFO = re.compile(r"(?:interim|acting)\s+(?:(?:group|global)\s+)?(?:cfo|chief financial officer)"
+                        r"|(?:cfo|chief financial officer)\s*\((?:interim|acting)\)", re.I)
+
+
 def _executives(review, company, cid, domains):
     # Company Enrich embeds PersonProfileEmployer, whose keys differ from
     # Person Enrich. Keep only dated employer roles, never names or biographies.
@@ -698,14 +702,17 @@ def _executives(review, company, cid, domains):
             hosts = {_domain(h) for h in _list(role.get("employer_website"))}
             matches = ids == {str(cid)} if ids else bool(hosts.intersection(domains))
             start, _ = _role_date(role.get("employee_start_date") or role.get("start_date"))
-            if not matches or not cutoff or not start or start.last > cutoff:
+            end, valid = _role_date(role.get("employee_end_date") or role.get("end_date"))
+            if not matches or not cutoff or not start or start.last > cutoff or not valid or end and end.first <= cutoff:
                 continue
             if type(pid) is int and pid > 0:
                 starts.setdefault(pid, set()).add(start)
-            if ids and refresh and start.first == start.last and start.last <= refresh <= cutoff:
+            title = role.get("employee_title") or role.get("title")
+            if (ids and refresh and start.first == start.last and start.last <= refresh <= cutoff
+                    and isinstance(title, str) and any(INTERIM_CFO.fullmatch(part.strip())
+                                                       for part in re.split(r"[,;/&|]|\band\b", title, flags=re.I))):
                 # Pass only the fields the prospective review rule consumes.
-                appointments.append({"crustdata_company_id": cid, "start_date": str(start.first),
-                                     "title": role.get("employee_title") or role.get("title")})
+                appointments.append({"crustdata_company_id": cid, "start_date": str(start.first), "title": title})
         if appointments:
             eligible.append({"basic_profile": {"last_updated": str(refresh)},
                              "experience": {"employment_details": {"current": appointments}}})
