@@ -7,7 +7,7 @@ import json
 import re
 from datetime import date, datetime, timedelta, timezone
 
-from .estate import MIN_GROUP, _credits, _day, _domain, _history, _identity, _role_date
+from .estate import MIN_COVERAGE, MIN_GROUP, Period, _credits, _day, _domain, _history, _identity, _role_date
 from .providers import OPERATIONS
 
 
@@ -217,6 +217,118 @@ def _filings(review, subject, inputs, company_name, domains):
         review.step("SEC filings", "unknown", "The returned index supplied no dated Item 5.02 or 4.01 filing for review.")
 
 
+def _person(review, inputs):
+    row = review.one("person_enrich")
+    env, person = _match(row, "person")
+    requested = _profile_key(inputs.get("person_url"))
+    if not requested or _profile_key(env.get("matched_on")) != requested:
+        review.step("Profile identity", "unresolved", "The requested profile has no unique, confident match.")
+        return {}, None, False
+    refresh = _day(person.get("updated_at") or _dict(person.get("basic_profile")).get("last_updated"))
+    retrieved = _day(row.get("as_of"))
+    fresh = bool(retrieved and refresh and timedelta(0) <= retrieved - refresh <= timedelta(days=30))
+    if not fresh:
+        review.step("Profile freshness", "unknown", "The profile refresh date is missing, old or outside the collection window.")
+    cutoff = min(retrieved, refresh) if retrieved and refresh else retrieved
+    return person, cutoff, fresh
+
+
+def _employer(role, cid, domains):
+    if role.domain in domains:
+        return cid if role.cid in (None, cid) else None
+    return role.cid or role.domain
+
+
+def _next_start(roles, cid, domains, cutoff):
+    """Date the first external job after the latest evidenced vendor tenure."""
+    vendor = [r for r in roles if _employer(r, cid, domains) == cid]
+    if not vendor or any(r.current or not r.end or r.end.last > cutoff for r in vendor):
+        return None
+    end = max(r.end for r in vendor)
+    # An overlapping, undated or ambiguous intervening role breaks the sequence.
+    after = [r for r in roles if r not in vendor and (not r.end or r.end.last >= end.first)
+             and (not r.start or r.start.first <= cutoff)]
+    if not after or any(not r.start for r in after):
+        return None
+    earliest = min(r.start.last for r in after)
+    first = [r for r in after if r.start.first <= earliest]
+    destinations = {_employer(r, cid, domains) for r in first}
+    start = Period(min(r.start.first for r in first), earliest)
+    if (None in destinations or len(destinations) != 1 or start.first < end.last or start.last > cutoff
+            or any(r.start and r.start.last >= start.first for r in vendor)):
+        return None
+    return start
+
+
+def _period_text(period):
+    return str(period.first) if period.first == period.last else f"{period.first} through {period.last}"
+
+
+def _sending_domain(review, inputs, domains):
+    row = review.one("rdap")
+    if not row:
+        return None
+    record = _dict(row.get("data"))
+    sender = inputs.get("sender_domain") or inputs.get("domain")
+    ldh = record.get("ldhName")
+    if (not isinstance(sender, str) or not isinstance(ldh, str) or not _domain(ldh)
+            or ldh.rstrip(".").casefold() != sender.rstrip(".").casefold()
+            or record.get("objectClassName", "domain") != "domain"):
+        review.step("Sender domain identity", "unresolved", "The RDAP record could not be tied to the queried domain.")
+        return None
+    dates = {_day(e.get("eventDate")) for e in _list(record.get("events"))
+             if isinstance(e, dict) and e.get("eventAction") == "registration"}
+    retrieved = _day(row.get("as_of"))
+    if len(dates) != 1:
+        return None
+    registered = dates.pop()
+    if not registered or not retrieved or registered > retrieved:
+        return None
+    age = (retrieved - registered).days
+    detail = f"RDAP records registration on {registered}, {age} days before collection."
+    card = review.card(row, "Domain registration", detail, observed=registered)
+    # The registered domain and the vendor's published domain have different
+    # roles in a payment inquiry. A vendor's own recent domain is context.
+    if inputs.get("sender_domain") and domains and _domain(sender) not in domains and age <= 30:
+        return card
+    return None
+
+
+def _bank(review, inputs):
+    row = review.one("ifsc")
+    data = _dict(row.get("data"))
+    code = inputs.get("ifsc")
+    if not isinstance(code, str) or not re.fullmatch(r"[A-Z]{4}0[A-Z0-9]{6}", code) or data.get("IFSC") != code:
+        return
+    detail = f"The submitted IFSC identifies bank code {code[:4]}."
+    for key, label in (("BANK", "Bank"), ("CITY", "City")):
+        value = data.get(key)
+        if isinstance(value, str) and re.fullmatch(r"[^\W\d_][\w .,&'()-]{0,80}", value):
+            detail += f" {label}: {value}."
+    review.card(row, "Bank branch lookup", detail + " Account ownership requires independent confirmation.")
+
+
+def _payment(review, inputs, cid, domains, consent):
+    _sending_domain(review, inputs, domains)
+    _bank(review, inputs)
+    if not cid or not consent or not inputs.get("person_url"):
+        return
+    person, cutoff, fresh = _person(review, inputs)
+    roles, complete = _history(person)
+    start = _next_start(roles, cid, domains, cutoff) if complete and cutoff else None
+    if not start:
+        review.step("Vendor employment transition", "unknown",
+                    "No ordered, dated next-employer start was established for this vendor.")
+        return
+    detail = f"The matched profile records a subsequent external employer start on {_period_text(start)}."
+    if not fresh:
+        detail += " Current affiliation requires a refreshed record."
+    card = review.card(review.one("person_enrich"), "Next-employer start", detail,
+                       observed=start.first if start.first == start.last else None)
+    if start.first != start.last:
+        card.update(observed_from=str(start.first), observed_through=str(start.last))
+
+
 def interpret(desk, subject, inputs, raw):
     """Project one run_live response (or its joined lanes) into ledger-safe findings."""
     inputs, raw = _dict(inputs), _dict(raw)
@@ -224,6 +336,12 @@ def interpret(desk, subject, inputs, raw):
     cid, domains, company_name, company = _company(review, subject, inputs)
     if desk == "company":
         _filings(review, subject, inputs, company_name, domains)
+    consent = inputs.get("consent") is not False and not any(
+        _dict(s).get("type") == "consent_required" for s in _list(raw.get("signals")))
+    if not consent:
+        review.step("Profile consent", "skipped", "Profile evidence requires consent.")
+    if desk == "payment":
+        _payment(review, inputs, cid, domains, consent)
     charges = [_credits(_dict(c).get("actual")) for c in _list(raw.get("credits"))]
     return dict(evidence=review.evidence, signals=review.signals, steps=review.steps, flows=[],
                 credits=float(sum(charges)) if charges and all(c is not None for c in charges) else None)

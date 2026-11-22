@@ -83,3 +83,83 @@ def test_partial_submissions_never_generate_an_event_from_retrieval_time(data):
         bad["data"]["filings"] = {}
     result = run("company", company(), bad)
     assert all(e["source"] != "sec" for e in result["evidence"])
+
+
+def role(cid, start, end=None):
+    return {"crustdata_company_id": cid, "start_date": start, "end_date": end, "title": PRIVATE}
+
+
+def profile(pid, past, current=(), updated="2026-10-12"):
+    return {"crustdata_person_id": pid, "updated_at": updated, "basic_profile": {"name": PRIVATE},
+            "experience": {"employment_details": {"past": list(past), "current": list(current)}}}
+
+
+def person(data, *, url=PROFILE, confidence=1):
+    return row("person_enrich", [{"matched_on": url, "match_status": "matched",
+                                  "match_type": "professional_network_profile_url",
+                                  "matches": [{"confidence_score": confidence, "person_data": data}]}])
+
+
+def rdap(domain="vendor-billing.example", registered="2026-10-04"):
+    return row("rdap", {"objectClassName": "domain", "ldhName": domain,
+                        "events": [{"eventAction": "last changed", "eventDate": "2026-10-13"},
+                                   {"eventAction": "registration", "eventDate": registered}],
+                        "entities": [PRIVATE]}, provider="rdap")
+
+
+PAY = {**INPUTS, "sender_domain": "vendor-billing.example", "ifsc": "ABCD0123456"}
+VENDOR = role(21, "2020-01-01", "2026-07-11")
+NEXT = role(71, "2026-08-08")
+
+
+def test_payment_uses_first_subsequent_start_and_exact_domain_registration():
+    bank = row("ifsc", {"IFSC": PAY["ifsc"], "BANK": "Example Bank", "CITY": "Pune", "CONTACT": PRIVATE},
+               provider="ifsc")
+    history = profile(81, [VENDOR, role(71, "2026-08-08", "2026-09-10")], [role(73, "2026-09-20")])
+    result = run("payment", bank, company(), person(history), rdap(), inputs=PAY)
+    assert card(result, "Next-employer start")["observed_on"] == "2026-08-08"
+    assert "11 days" in card(result, "Domain registration")["detail"]
+    assert "Example Bank" in card(result, "Bank branch lookup")["detail"]
+    assert PRIVATE not in json.dumps(result) and PROFILE not in json.dumps(result)
+
+
+@pytest.mark.parametrize("past,current", [
+    ([VENDOR], []),  # an end date by itself
+    ([], [role(21, "2017-01-01")]),  # still-current listing
+    ([VENDOR], [role(22, "2026-06-01")]),  # overlapping employment
+    ([VENDOR], [role(22, "2026-12-01")]),
+    ([VENDOR, role(66, None, "2026-09-01")], [NEXT]),
+    ([VENDOR], [NEXT, role(72, "2026-08-08")]),
+    ([VENDOR], [NEXT, role(21, "2026-10-01")]),  # returned to vendor
+    ([role(21, "2020-01", "2026-08")], [role(71, "2026-08")]),
+    ([VENDOR], [role(None, "2026-08-01"), NEXT]),
+])
+def test_ambiguous_movements_remain_unknown(past, current):
+    result = run("payment", company(), person(profile(81, past, current)), inputs=PAY)
+    assert all(e["label"] != "Next-employer start" for e in result["evidence"])
+
+
+@pytest.mark.parametrize("person_row", [
+    person(profile(81, [VENDOR], [NEXT]), url=PROFILE + "somebody-else"),
+    person(profile(81, [VENDOR], [NEXT]), confidence=0.6),
+    row("person_enrich", None, status="unavailable"),
+])
+def test_unbound_profile_cannot_join_payment_claim(person_row):
+    result = run("payment", company(), person_row, rdap(), inputs=PAY)
+    assert all(e["label"] != "Next-employer start" for e in result["evidence"])
+
+
+def test_missing_permission_suppresses_person_evidence_even_with_company_data():
+    result = run("payment", company(), person(profile(81, [VENDOR], [NEXT])), rdap(), inputs=PAY,
+                 signals=[{"type": "consent_required", "operation": "person_enrich"}])
+    assert all(e["operation"] != "person_enrich" for e in result["evidence"])
+    assert any(s["name"] == "Profile consent" for s in result["steps"])
+
+
+@pytest.mark.parametrize("domain,registered", [
+    ("unrelated.example", "2026-10-04"), ("vendor-billing.example", None),
+    ("vendor-billing.example", "2026-11-01"),
+])
+def test_missing_or_mismatched_registration_is_not_domain_age(domain, registered):
+    result = run("payment", company(), rdap(domain, registered), inputs=PAY)
+    assert all(e["label"] != "Domain registration" for e in result["evidence"])
