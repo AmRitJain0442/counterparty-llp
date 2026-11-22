@@ -119,3 +119,46 @@ def test_old_cases_hidden_without_deleting_records(client):
     assert client.post("/api/cases/old/reviews", json={"disposition": "Review complete", "note": "Done"}).status_code == 404
     assert storage._ledger().get("cases", storage._case_key("old")) is not None
     assert client.get("/api/exhibits/older-estate").status_code == 404
+
+
+def test_named_role_through_live_api_and_report(client, monkeypatch):
+    from backend import live, swarm
+    from test_named_leadership import company, officer
+
+    name, title = "Alex Example", "CFO"
+    calls = []
+    def collect(desk, subject, consent, inputs):
+        rows = []
+        for op, payload in inputs.get("crustdata", {}).items():
+            calls.append(op)
+            if op == "company_identify":
+                assert payload == {"domains": ["vendor.example"], "exact_match": True}
+            extra = {"people": {"founders": [officer()]}} if op == "company_enrich" else {}
+            rows.append({**company(op, **extra), "source": "https://api.crustdata.com/company"})
+        return dict(evidence=rows, steps=[], signals=[], flows=[], credits=[])
+    monkeypatch.setattr(live, "run_live", collect)
+    monkeypatch.delenv("SEC_USER_AGENT", raising=False)
+    monkeypatch.setattr(main, "collect_live", live.collect_live)
+    question = "Which title does the company roster report?"
+    def draft(desk, context, verdict, role, **kwargs):
+        inquiry = {c["label"]: c for c in context if c.get("source") == "User intake"}
+        assert inquiry["Requested executive"]["detail"] == name
+        assert inquiry["Question to investigate"]["detail"] == question
+        assert all("id" not in c for c in inquiry.values())
+        reference = next(c["id"] for c in context if c.get("label") == "Named executive role")
+        return {"note": "The roster lists the Chief Financial Officer role.", "assessment": "ready", "refs": [reference]}, "complete"
+    monkeypatch.setattr(swarm, "draft_note", draft)
+    response = client.post("/api/cases", json={"desk":"company", "subject":"vendor.example",
+                           "inputs":{"executive_name":name, "executive_title":title, "claim":question}})
+    assert response.status_code == 201
+    case = response.json()
+    assert case["verdict"] == "ROLE REPORTED" and name in case["summary"]
+    assert "Chief Financial Officer" in case["summary"] and "2026-10-12" in case["summary"]
+    assert case["draft"] == "The roster lists the Chief Financial Officer role."
+    assert calls == ["company_identify", "company_enrich"]
+    assert client.get("/api/cases/" + case["id"] + "/receipt").status_code == 200
+
+
+@pytest.mark.parametrize("desk,inputs", [("company", {"executive_title": "CEO"}), ("estate", {"executive_name": "Alex"})])
+def test_invalid_executive_intake_stops_before_collection(client, desk, inputs):
+    assert client.post("/api/cases", json={"desk":desk, "subject":"Example", "inputs":inputs}).status_code == 422

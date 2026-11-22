@@ -38,7 +38,8 @@ class Intake(BaseModel):
     @field_validator("inputs")
     @classmethod
     def validate_inputs(cls, inputs):
-        allowed = {"domain", "sender_domain", "person_url", "ifsc", "orgnr", "cik", "claim", "lei"}
+        allowed = {"domain", "sender_domain", "person_url", "ifsc", "orgnr", "cik", "claim", "lei",
+                   "executive_name", "executive_title"}
         if inputs.keys() - allowed:
             raise ValueError("Unrecognized desk input")
         if any(len(v) > (2000 if k == "claim" else 300) for k, v in inputs.items()):
@@ -130,6 +131,12 @@ def investigate(intake: Intake):
     subject = intake.subject.strip()
     if not subject:
         raise HTTPException(422, "Enter a subject for this live inquiry")
+    executive = intake.inputs.get("executive_name")
+    title = intake.inputs.get("executive_title")
+    if (executive or title) and intake.desk != "company":
+        raise HTTPException(422, "Use the Company desk for a leadership roster check.")
+    if title and not executive:
+        raise HTTPException(422, "Enter the executive's name to check a claimed title.")
     if intake.desk == "candidate" and not intake.consent:
         raise HTTPException(422, "Candidate consent is required")
     with progress.record_collection() as collections:
@@ -161,8 +168,13 @@ def investigate(intake: Intake):
         if stream_event:
             stream_event(event)
 
+    inquiry = []
+    if intake.desk == "company":
+        inquiry = [{"label": label, "detail": value, "source": "User intake"} for label, value in (
+            ("Submitted company", subject), ("Requested executive", executive),
+            ("Claimed title", title), ("Question to investigate", intake.inputs.get("claim"))) if value]
     reports = run_council(intake.desk, case["evidence"], ruling["verdict"], observe, intake.mode,
-                          verdict_summary=ruling["summary"], proposition=raw.get("proposition"))
+                          verdict_summary=ruling["summary"], proposition=raw.get("proposition"), inquiry=inquiry)
     case["collection_events"] = collections
     case["swarm_roster"] = agents_for(intake.desk)
     case["swarm_events"] = trace

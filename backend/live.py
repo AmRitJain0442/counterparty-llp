@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 from .providers import run_live
 from .identity import resolve_public_ids
 from .observations import describe
-from .findings import interpret
+from .findings import interpret, _input_domain
 from .estate import estate_evidence
 from .destination import screen_destination
 from .progress import report
@@ -16,7 +16,13 @@ from .progress import report
 def collect_live(desk, subject, consent=False, inputs=None):
     supplied = inputs if isinstance(inputs, dict) else {}
     safe = {k: str(supplied[k])[:500] for k in
-            ('domain', 'sender_domain', 'person_url', 'ifsc', 'orgnr', 'cik', 'claim', 'lei') if k in supplied}
+            ('domain', 'sender_domain', 'person_url', 'ifsc', 'orgnr', 'cik', 'claim', 'lei',
+             'executive_name', 'executive_title') if k in supplied}
+    named_executive = desk == 'company' and bool(safe.get('executive_name'))
+    if desk == 'company' and not safe.get('domain'):
+        subject_domain = _input_domain(subject)
+        if subject_domain:
+            safe['domain'] = subject_domain
     safe = resolve_public_ids(desk, subject, safe)
     calls = {}
     person = safe.get('person_url', '')
@@ -50,8 +56,9 @@ def collect_live(desk, subject, consent=False, inputs=None):
         company = matches[0].get('company_data', {})
         cid = company.get('crustdata_company_id') or company.get('basic_info', {}).get('crustdata_company_id')
         if isinstance(cid, int):
-            operations = {"company_enrich": {"crustdata_company_ids": [cid], "fields": ["basic_info", "headcount", "people"]}}
-            if desk == "company":
+            fields = ["basic_info", "people"] if named_executive else ["basic_info", "headcount", "people"]
+            operations = {"company_enrich": {"crustdata_company_ids": [cid], "fields": fields}}
+            if desk == "company" and not named_executive:
                 operations["job_search"] = {"filters": {"field": "company.basic_info.company_id", "type": "=", "value": cid},
                                             "fields": ["metadata.date_added", "company.basic_info.crustdata_company_id"], "limit": 1,
                                             "sorts": [{"field": "metadata.date_added", "order": "desc"}]}
@@ -73,6 +80,8 @@ def collect_live(desk, subject, consent=False, inputs=None):
     evidence = []
     for e in raw['evidence']:
         detail = describe(e)
+        if named_executive and e['operation'] == 'company_enrich' and e['status'] == 'ok':
+            detail = 'Retrieved the company record to check its leadership roster.'
         evidence.append(dict(source=e['provider'], label=e['operation'], detail=detail,
                              as_of=e['as_of'], mode='LIVE', url=e['source'], status=e.get('status', 'unknown')))
     credits = [c.get('actual') for c in raw['credits']]
@@ -84,7 +93,9 @@ def collect_live(desk, subject, consent=False, inputs=None):
     result["steps"].extend(step for step in interpreted["steps"] if step not in result["steps"])
     result["signals"].extend(interpreted["signals"])
     result["proposition"] = interpreted.get("proposition")
-    if interpreted.get("forecast") and not any(step["status"] == "unresolved" for step in interpreted["steps"]):
+    if interpreted.get("leadership_review"):
+        result["leadership_review"] = interpreted["leadership_review"]
+    elif interpreted.get("forecast") and not any(step["status"] == "unresolved" for step in interpreted["steps"]):
         result["forecast"] = interpreted["forecast"]
     if person and consent is not True:
         result['signals'].append(dict(type='consent_required', provider='crustdata', operation='person_enrich', status='skipped'))

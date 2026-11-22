@@ -11,6 +11,13 @@ def adjudicate(desk, raw):
                    and c.get("label") == "Vendor domain cross-check" and c.get("mode") == "LIVE"}
         if sources >= {"Crustdata", "Brønnøysund"}:
             return {"verdict": "HELD", "summary": claim + " Confirm the request by calling the number on file."}
+    if desk == "company":
+        for step in raw.get("steps", []):
+            if step.get("name") in {"Company identity", "Company enrichment identity"} and step.get("status") == "unresolved":
+                return {"verdict": "IDENTITY REVIEW", "summary": step["detail"]}
+        if raw.get("leadership_review"):
+            review = raw["leadership_review"]
+            return {"verdict": review["verdict"], "summary": review["summary"]}
     if desk == "company" and raw.get("forecast"):
         return {"verdict": "FORECAST FOR REVIEW", "summary": raw["forecast"]["prediction"]}
     unresolved = any(s.get("status") == "unresolved" for s in raw.get("steps", []))

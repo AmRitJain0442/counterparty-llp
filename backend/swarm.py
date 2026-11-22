@@ -48,7 +48,7 @@ def agents_for(desk):
     return leads + children
 
 
-def run_council(desk, evidence, verdict, emit, mode, *, verdict_summary='', proposition=''):
+def run_council(desk, evidence, verdict, emit, mode, *, verdict_summary='', proposition='', inquiry=()):
     """Run parallel stages, emitting serialized events with completed dependencies.
 
     All runtime state belongs to this invocation. Live model failures remain visible
@@ -86,7 +86,7 @@ def run_council(desk, evidence, verdict, emit, mode, *, verdict_summary='', prop
             else:
                 dependencies = [dict(label=f'Dependency {r["agent_id"]}', detail=f"{r.get('assessment') or 'Observation'}: {r['detail']}",
                                  source=', '.join(r['refs'])) for r in upstream]
-                context = [dict(label='Bounded assignment', detail=agent['task'], source='Council'), decision_context,
+                context = [dict(label='Bounded assignment', detail=agent['task'], source='Council'), *inquiry, decision_context,
                            *dependencies, *rows]
                 role = 'counsel' if key.startswith('challenger') else 'analyst'
                 review, status = draft_note(desk, context, verdict, 'partner' if key == 'partner' else role, persona=agent['persona'], mandate=agent['task'])
@@ -153,7 +153,7 @@ def run_council(desk, evidence, verdict, emit, mode, *, verdict_summary='', prop
                 dependencies = [dict(label=f"Dependency {r['agent_id']}",
                                  detail=f"{r['status']} / {r.get('assessment')}: {r['detail']}",
                                  source=', '.join(r['refs'])) for r in upstream]
-                review, status = draft_note(desk, [decision_context, *dependencies, *rows], verdict, 'specialist',
+                review, status = draft_note(desk, [*inquiry, decision_context, *dependencies, *rows], verdict, 'specialist',
                                             persona=spec['persona'], mandate=spec['task'])
             if review is None:
                 result = failure(agent, status)

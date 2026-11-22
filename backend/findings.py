@@ -174,6 +174,9 @@ def _company(review, desk, subject, inputs):
     domain = _input_domain(inputs.get("domain"))
     sec = _dict(review.one("submissions").get("data"))
     named = name and name == _issuer_name(subject)
+    if desk == "company" and domain in domains and name:
+        # A verified domain anchors spacing variants such as "SkanAI" and "Skan AI".
+        named = named or name.replace(" ", "") == _issuer_name(subject).replace(" ", "")
     ticker = (name and name == _issuer_name(sec.get("name")) and _cik(sec.get("cik"))
               and _cik(sec["cik"]) == _cik(inputs.get("cik")) and _issuer_subject(sec, subject))
     if inputs.get("domain"):
@@ -193,7 +196,12 @@ def _company(review, desk, subject, inputs):
         bound = False
     if not cid or not bound:
         status = "unresolved" if review.rows.get(primary) else "unknown"
-        review.step("Company identity", status, "A unique company tied to the intake identifier is required.")
+        detail = "A unique company tied to the intake identifier is required."
+        if desk == "company" and company and not named:
+            matched_name = _dict(company.get("basic_info")).get("name")
+            detail = (f"Crustdata returned {matched_name or 'a company'}, but it could not be matched to the company subject. "
+                      "Enter the company's name or domain as the subject. For a leadership check, use the separate executive fields.")
+        review.step("Company identity", status, detail)
         return None, [], "", {}
     review.card(row, "Company identity", "A unique company record matched the intake identifier.")
     if primary == "company_enrich" or not review.rows.get("company_enrich"):
@@ -683,6 +691,90 @@ INTERIM_CFO = re.compile(r"(?:interim|acting)\s+(?:(?:group|global)\s+)?(?:cfo|c
                         r"|(?:cfo|chief financial officer)\s*\((?:interim|acting)\)", re.I)
 
 
+def executive_titles_match(first, second):
+    """Compare exact titles, expanding only standard, unambiguous officer acronyms."""
+    aliases = {"ceo": "chief executive officer", "cfo": "chief financial officer", "cto": "chief technology officer",
+               "cpo": "chief product officer", "cpto": "chief product and technology officer",
+               "coo": "chief operating officer", "cmo": "chief marketing officer", "cro": "chief revenue officer"}
+    def normalized(value):
+        if not isinstance(value, str):
+            return set()
+        parts = [_name(part.replace("&", " and ")) for part in re.split(r"[,;|]", value)]
+        parts = [p for p in parts if p not in {"founder", "co founder", "cofounder"}]
+        return {aliases.get(p, p) for p in parts if p}
+    first_roles = normalized(first)
+    return bool(first_roles and first_roles == normalized(second))
+
+
+def _named_leadership(review, company, cid, domains, inputs):
+    """A company roster is one provider's report, never independent verification."""
+    wanted = _name(inputs.get("executive_name"))
+    if not wanted:
+        return None
+
+    def unresolved(reason):
+        summary = reason + " Confirm the role with a dated statement from the company."
+        review.step("Named executive role", "unresolved", summary)
+        return {"verdict": "ROLE REVIEW", "summary": summary}
+
+    if not cid or not company:
+        return unresolved("The company identity or company enrichment could not be bound to the intake.")
+    row = review.one("company_enrich")
+    people = _dict(company.get("people"))
+    profiles = [_dict(p) for group in ("cxos", "founders", "decision_makers") for p in _list(people.get(group))]
+    matches = [p for p in profiles if _name(_dict(p.get("basic_profile")).get("name") or p.get("name")) == wanted]
+    if not matches:
+        return unresolved("The returned executive roster has no exact name match. Its coverage may be incomplete.")
+    ids = {p.get("crustdata_person_id") for p in matches if type(p.get("crustdata_person_id")) is int}
+    if (len(ids) != 1 or any(type(p.get("crustdata_person_id")) is not int for p in matches)
+            or next(iter(ids), 0) <= 0 or any(p != matches[0] for p in matches[1:])):
+        return unresolved("The exact name has ambiguous or conflicting person records in the returned roster.")
+    profile = matches[0]
+    cutoff = _day(row.get("as_of"))
+    refresh = _day(profile.get("updated_at") or _dict(profile.get("basic_profile")).get("last_updated"))
+    fresh = bool(cutoff and refresh and timedelta(0) <= cutoff - refresh <= INDEX_MAX_AGE)
+    roles = []
+    for role in _list(_dict(_dict(profile.get("experience")).get("employment_details")).get("current")):
+        role = _dict(role)
+        values = role.get("employer_company_id", role.get("crustdata_company_id"))
+        employer_ids = {str(v) for v in (values if isinstance(values, list) else [values]) if v is not None}
+        if role.get("crustdata_company_id") is not None:
+            employer_ids.add(str(role["crustdata_company_id"]))
+        sites = role.get("employer_website", [])
+        hosts = {_domain(v) for v in (sites if isinstance(sites, list) else [sites])} - {None, ""}
+        bound = employer_ids == {str(cid)} if employer_ids else bool(hosts.intersection(domains))
+        if not bound or hosts and domains and not hosts.intersection(domains):
+            continue
+        start, start_valid = _role_date(role.get("employee_start_date") or role.get("start_date"))
+        end, end_valid = _role_date(role.get("employee_end_date") or role.get("end_date"))
+        title = role.get("employee_title") or role.get("title")
+        if (not start_valid or not start or not refresh or not cutoff or start.last > min(refresh, cutoff) or not end_valid or end is not None
+                or role.get("is_current") is False or not isinstance(title, str) or not _name(title)):
+            return unresolved("The matched person's company role has incomplete or conflicting current-role dates or title.")
+        roles.append((title.strip(), start))
+    if not roles:
+        return unresolved("No dated current role for the exact person could be bound to this company.")
+    if len({(_name(t), s) for t, s in roles}) != 1:
+        return unresolved("The matched person has conflicting current titles or appointment dates for this company.")
+    title, start = roles[0]
+    if not fresh:
+        detail = (f"Crustdata's employer-bound record lists {title}, starting {_period_text(start)}, "
+                  f"with profile refresh on {refresh}. The refresh falls outside the 30-day window ending {cutoff}; "
+                  "a current role is not established.")
+        review.card(row, "Named executive role", detail, observed=refresh)
+        return {**unresolved(detail), "reported_title": title}
+    claimed = inputs.get("executive_title")
+    company_name = _dict(company.get("basic_info")).get("name") or "the matched company"
+    summary = (f"Crustdata lists {inputs['executive_name']} as {title} at {company_name}, with a role start of "
+               f"{_period_text(start)} and a profile refresh on {refresh}.")
+    review.card(row, "Named executive role", summary, observed=refresh)
+    if claimed and not executive_titles_match(claimed, title):
+        return {**unresolved(f"{summary} The reported title does not exactly match the submitted title ({claimed})."),
+                "reported_title": title}
+    summary += " This is one provider's report. A dated statement from the company would provide independent confirmation."
+    return {"verdict": "ROLE REPORTED", "summary": summary, "reported_title": title}
+
+
 def _executives(review, company, cid, domains):
     # Company Enrich embeds PersonProfileEmployer, whose keys differ from
     # Person Enrich. Keep only dated employer roles, never names or biographies.
@@ -760,11 +852,13 @@ def interpret(desk, subject, inputs, raw):
     inputs, raw = _dict(inputs), _dict(raw)
     review = _Review(raw)
     forecast = None
+    leadership = None
     if desk in ("payment", "candidate", "company"):
         cid, domains, company_name, company = _company(review, desk, subject, inputs)
     if desk == "company":
+        leadership = _named_leadership(review, company, cid, domains, inputs)
         _filings(review, subject, inputs, company_name, domains)
-        if company:
+        if company and not leadership:
             _workforce(review, company)
             forecast = _executives(review, company, cid, domains)
         if cid:
@@ -785,4 +879,6 @@ def interpret(desk, subject, inputs, raw):
         result["proposition"] = review.proposition
     if forecast:
         result["forecast"] = forecast
+    if leadership:
+        result["leadership_review"] = leadership
     return result
