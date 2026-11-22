@@ -7,12 +7,10 @@ from urllib.parse import urlsplit
 from .providers import run_live
 from .identity import resolve_public_ids
 from .observations import describe
-from .colleagues import overlap_count
 from .findings import interpret
 from .estate import estate_evidence
 from .destination import screen_destination
 from .progress import report
-from .forecast import forecast_window
 
 
 def collect_live(desk, subject, consent=False, inputs=None):
@@ -48,7 +46,6 @@ def collect_live(desk, subject, consent=False, inputs=None):
     identified = next((e['data'] for e in raw['evidence'] if e['operation'] == 'company_identify'), None)
     matches = identified[0].get('matches', []) if isinstance(identified, list) and len(identified) == 1 else []
     matches = [m for m in matches if isinstance(m, dict) and isinstance(m.get('confidence_score'), (int, float)) and m['confidence_score'] >= .8]
-    overlap_note = None
     if len(matches) == 1:
         company = matches[0].get('company_data', {})
         cid = company.get('crustdata_company_id') or company.get('basic_info', {}).get('crustdata_company_id')
@@ -56,7 +53,7 @@ def collect_live(desk, subject, consent=False, inputs=None):
             operations = {"company_enrich": {"crustdata_company_ids": [cid], "fields": ["basic_info", "headcount", "people"]}}
             if desk == "company":
                 operations["job_search"] = {"filters": {"field": "company.basic_info.company_id", "type": "=", "value": cid},
-                                            "fields": ["metadata.date_added"], "limit": 1,
+                                            "fields": ["metadata.date_added", "company.basic_info.crustdata_company_id"], "limit": 1,
                                             "sorts": [{"field": "metadata.date_added", "order": "desc"}]}
             extra = run_live(desk, "", consent, {"crustdata": operations})
             for key in ('evidence', 'steps', 'credits', 'signals'):
@@ -73,20 +70,11 @@ def collect_live(desk, subject, consent=False, inputs=None):
                     peers = run_live(desk, "", consent, {"crustdata": {"person_search": payload}})
                     for key in ("evidence", "steps", "credits", "signals"):
                         raw[key].extend(peers[key])
-                    row = peers["evidence"][0]
-                    count = overlap_count(target, row.get("data") or {}, cid)
-                    detail = (f"{count} distinct colleagues have a dated overlap in this sample."
-                              if count is not None and count >= 5 else
-                              "Insufficient dated overlap to publish an aggregate.")
-                    overlap_note = dict(source="Crustdata", label="Colleague overlap", detail=detail,
-                                        as_of=row["as_of"], mode="LIVE", url=row["source"])
     evidence = []
     for e in raw['evidence']:
         detail = describe(e)
         evidence.append(dict(source=e['provider'], label=e['operation'], detail=detail,
                              as_of=e['as_of'], mode='LIVE', url=e['source'], status=e.get('status', 'unknown')))
-    if overlap_note:
-        evidence.append(overlap_note)
     credits = [c.get('actual') for c in raw['credits']]
     result = dict(evidence=evidence, steps=[dict(name=s['operation'], status=s['status'], detail='Provider collection') for s in raw['steps']],
                   flows=[], credits=sum(float(c) for c in credits) if credits and all(c is not None for c in credits) else None,
@@ -96,19 +84,8 @@ def collect_live(desk, subject, consent=False, inputs=None):
     result["steps"].extend(step for step in interpreted["steps"] if step not in result["steps"])
     result["signals"].extend(interpreted["signals"])
     result["proposition"] = interpreted.get("proposition")
-    if desk == "company" and len(matches) == 1 and isinstance(cid, int) and not any(
-            s.get("status") == "unresolved" for s in interpreted["steps"]):
-        response = next((e for e in raw["evidence"] if e["operation"] == "company_enrich"), {})
-        records = response.get("data") or []
-        enrich_matches = records[0].get("matches", []) if isinstance(records, list) and records else []
-        enriched = enrich_matches[0].get("company_data", {}) if len(enrich_matches) == 1 else {}
-        if enriched.get("crustdata_company_id") == cid:
-            forecast = forecast_window(cid, enriched, interpreted["evidence"], datetime.now(timezone.utc).date())
-            if forecast:
-                result["forecast"] = forecast
-                result["evidence"].append({"label":"Interim finance appointment", "source":"Crustdata",
-                                           "as_of":response["as_of"], "mode":"LIVE", "url":response["source"],
-                                           "detail":f"An interim finance role started on {forecast['observed_on']}."})
+    if interpreted.get("forecast") and not any(step["status"] == "unresolved" for step in interpreted["steps"]):
+        result["forecast"] = interpreted["forecast"]
     if person and consent is not True:
         result['signals'].append(dict(type='consent_required', provider='crustdata', operation='person_enrich', status='skipped'))
     if desk == "estate" and len(matches) == 1:

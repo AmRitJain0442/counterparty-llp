@@ -31,6 +31,9 @@ def _name(value):
 
 def _issuer_name(value):
     # Accept common punctuation/legal-suffix variants, never a substring match.
+    if isinstance(value, str):
+        # Public company profiles may append an accelerator batch to the legal name.
+        value = re.sub(r"\s*\(YC [WSFX]\d{2}\)\s*$", "", value, flags=re.I)
     return re.sub(r" (?:incorporated|inc|corporation|corp|ltd|limited|plc|as)$", "", _name(value))
 
 

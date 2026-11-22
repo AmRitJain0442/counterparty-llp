@@ -491,3 +491,9 @@ def test_live_candidate_intake_uses_the_claim_and_its_actual_witness(monkeypatch
     assert result["proposition"] == count["claim"]
     assert any(s["evidence_id"] == count["id"] and s["provider"] == "crustdata" for s in result["signals"])
     assert adjudicate("candidate", result)["verdict"] == "INSUFFICIENT WITNESSES"
+
+
+def test_issuer_name_accepts_a_trailing_accelerator_batch_only():
+    from backend.findings import _issuer_name
+    assert _issuer_name("Crustdata (YC F24)") == _issuer_name("Crustdata")
+    assert _issuer_name("Crustdata (Europe)") != _issuer_name("Crustdata")
