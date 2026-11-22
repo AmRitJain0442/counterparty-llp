@@ -13,7 +13,6 @@ export default function SwarmAtlas({onFile,desk,onDesk,cases=[]}) {
   const [section,setSection]=useState('agents')
   const [events,setEvents]=useState([])
   const [record,setRecord]=useState(null)
-  const [mode,setMode]=useState('demo')
   const [subject,setSubject]=useState('')
   const [inputs,setInputs]=useState({})
   const [consent,setConsent]=useState(false)
@@ -22,7 +21,6 @@ export default function SwarmAtlas({onFile,desk,onDesk,cases=[]}) {
   const [playing,setPlaying]=useState(()=>!window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [playhead,setPlayhead]=useState(null)
   const [search,setSearch]=useState(null)
-  const [runMode,setRunMode]=useState('demo')
   const inflight=useRef(null)
   const inputRef=useRef(null)
   const requestedCase=useRef(new URLSearchParams(location.search).get('case'))
@@ -44,7 +42,7 @@ export default function SwarmAtlas({onFile,desk,onDesk,cases=[]}) {
   const specialists=agents.filter(a=>a.parent_id).length
   const matches=search===null?[]:agents.filter(a=>[a.name,a.persona,a.group].some(value=>
     value?.toLowerCase().includes(search.trim().toLowerCase())))
-  const preview=!running&&!record&&events.length===0
+  const idle=!running&&!record&&events.length===0
   useEffect(()=>{
     const controller=new AbortController()
     inflight.current?.abort();inflight.current=null;setRunning(false)
@@ -84,9 +82,9 @@ export default function SwarmAtlas({onFile,desk,onDesk,cases=[]}) {
     if(inflight.current)return
     const controller=new AbortController()
     inflight.current=controller
-    setRunning(true);setSelected(null);setRunMode(mode);setError('');setRecord(null);setEvents([]);setPlayhead(mode==='demo'&&playing?0:null);setPanel(true);setSection('trace')
+    setRunning(true);setSelected(null);setError('');setRecord(null);setEvents([]);setPlayhead(null);setPanel(true);setSection('trace')
     try {
-      const result=await streamCase({desk,mode,subject,consent,inputs},e=>{if(!controller.signal.aborted)setEvents(items=>[...items,e])},controller.signal)
+      const result=await streamCase({desk,mode:'live',subject:subject.trim(),consent,inputs},e=>{if(!controller.signal.aborted)setEvents(items=>[...items,e])},controller.signal)
       if(!controller.signal.aborted){setRecord(result);onFile?.(result)}
     }catch(e){if(e.name!=='AbortError')setError(e.message)}
     finally{if(inflight.current===controller){inflight.current=null;setRunning(false)}}
@@ -94,7 +92,7 @@ export default function SwarmAtlas({onFile,desk,onDesk,cases=[]}) {
   function saved(id) {
     const found=cases.find(c=>c.id===id)
     if(!found||running)return
-    setSelected(null);setRecord(found);setRunMode(found.mode);setEvents([...(found.collection_events||[]),...(found.swarm_events||[])]);setPlayhead(playing?0:null);setSection('trace')
+    setSelected(null);setRecord(found);setEvents([...(found.collection_events||[]),...(found.swarm_events||[])]);setPlayhead(playing?0:null);setSection('trace')
   }
   useEffect(()=>{
     if(!requestedCase.current) return
@@ -115,15 +113,15 @@ export default function SwarmAtlas({onFile,desk,onDesk,cases=[]}) {
     <div className="atlas-layout">
       <div className="atlas-field">
         <div className="atlas-crumb">Firm <span>/</span> {DESKS.find(d=>d.id===desk)?.name} desk <span>/</span> <b>Swarm map</b></div>
-        <SwarmMap agents={agents} selected={selected} onSelect={inspect} events={visibleEvents} reports={playhead===null?record?.swarm_reports:undefined} running={running} preview={preview} playing={playing} onToggle={()=>{if(!playing&&record&&playhead===null)replay();else setPlaying(v=>!v)}}/>
+        <SwarmMap agents={agents} selected={selected} onSelect={inspect} events={visibleEvents} reports={playhead===null?record?.swarm_reports:undefined} running={running} idle={idle} recorded={!!record} playing={playing} onToggle={()=>{if(!playing&&record&&playhead===null)replay();else setPlaying(v=>!v)}}/>
         <div className="atlas-caption"><h1>Counterparty investigation map.</h1>
           <p>{specialists?'Select a lead or its paired specialists to inspect their findings.':'Select an agent to trace its witnesses, handoffs and findings.'}</p>
           <button onClick={()=>{setPanel(true);setSection('run')}}>Open an investigation ↗</button>
         </div>
         <div className="atlas-counts">{specialists>0?<><span>leads<b>{agents.length-specialists}</b></span><span>specialists<b>{specialists}</b></span></>:<span>agents<b>{agents.length||'—'}</b></span>}<span>desk<b>{desk}</b></span></div>
       </div>
-      {panel&&<div className="atlas-dock"><Inspector {...{desk,agents,events:trace,running,record,mode,setMode,subject,setSubject,inputs,setInputs,consent,setConsent,error,
-        section,setSection,onReplay:replay,runMode,replaying:playhead!==null}} agent={active} onSelect={inspect} onClose={()=>{setPanel(false);setSelected(null)}} onRun={run}
+      {panel&&<div className="atlas-dock"><Inspector {...{desk,agents,events:trace,running,record,subject,setSubject,inputs,setInputs,consent,setConsent,error,
+        section,setSection,onReplay:replay,replaying:playhead!==null}} agent={active} onSelect={inspect} onClose={()=>{setPanel(false);setSelected(null)}} onRun={run}
         onDesk={v=>{if(!running)onDesk(v)}} caseOptions={cases.filter(c=>c.desk===desk&&(c.swarm_events?.length||c.swarm_reports?.length)).map(c=>({id:c.id,label:c.subject+' · '+c.id.slice(0,6)}))} onCase={saved}/></div>}
     </div>
     {error&&!panel&&<p role="alert">{error}</p>}

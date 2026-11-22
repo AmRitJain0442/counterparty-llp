@@ -24,15 +24,14 @@ const optId = o => (typeof o === 'string' ? o : o.id ?? o.value ?? o.key)
 const optName = o => (typeof o === 'string' ? o : o.label ?? o.name ?? o.title ?? String(optId(o)))
 
 export default function Inspector({
-  desk, agent, agents = [], events = [], onSelect, onClose, onRun, running, record, mode = 'demo', setMode,
+  desk, agent, agents = [], events = [], onSelect, onClose, onRun, running, record,
   subject = '', setSubject, inputs = {}, setInputs, consent = false, setConsent, onDesk, caseOptions = [], onCase, error,
-  section, setSection, onReplay, replaying, runMode,
+  section, setSection, onReplay, replaying,
 }) {
   const spec = DESK_BY_ID[desk] || DESKS[0]
   const [open, setOpen] = useState({})
   const body = useRef(null)
   useEffect(() => { body.current?.scrollTo(0, 0) }, [section, agent?.id, desk])
-  const live = mode === 'live'
 
   const latest = useMemo(() => {
     const m = {}
@@ -56,9 +55,9 @@ export default function Inspector({
   const status = id => latest[id]?.status || finding(id)?.status
   const report = agent && finding(agent.id)
   const recent = events.slice(-8).reverse()
-  const needsConsent = live && (spec.alwaysConsent || spec.consentFor?.some(k => (inputs[k] || '').trim()))
+  const needsConsent = spec.alwaysConsent || spec.consentFor?.some(k => (inputs[k] || '').trim())
   const rosterOpen = g => open[g] ?? (agent ? agent.group === g : g === 'identity')
-  const missing = live && (!subject.trim() || spec.fields.some(f => f.required && !(inputs[f.key] || '').trim()) || (needsConsent && !consent))
+  const missing = !subject.trim() || spec.fields.some(f => f.required && !(inputs[f.key] || '').trim()) || (needsConsent && !consent)
 
   const submit = e => { e.preventDefault(); if (!running && !missing) onRun?.() }
   const rosterButton = a => (
@@ -142,21 +141,13 @@ export default function Inspector({
 
         </>}
         {section === 'run' && <form className="insp-sec insp-form" onSubmit={submit}>
-          <h3>Investigation mode</h3>
-          <div className="insp-mode" role="radiogroup" aria-label="Run mode">
-            {['demo', 'live'].map(m => (
-              <label key={m} className={mode === m ? 'on' : ''}>
-                <input type="radio" name="insp-mode" checked={mode === m} onChange={() => setMode?.(m)} />{m === 'demo' ? 'Demo' : 'Live'}
-              </label>
-            ))}
-          </div>
-
-          <label className="insp-f"><span>{live ? 'Subject' : 'Subject (optional)'}</span>
-            <input value={subject} maxLength={180} required={live} onChange={e => setSubject?.(e.target.value)}
-              placeholder={live ? 'The company or person being checked' : 'Leave blank to use the seeded case'} />
+          <h3>Live investigation</h3>
+          <label className="insp-f"><span>Subject</span>
+            <input value={subject} maxLength={180} required onChange={e => setSubject?.(e.target.value)}
+              placeholder="The company or person being checked" />
           </label>
 
-          {live && spec.fields.map(f => (
+          {spec.fields.map(f => (
             <label key={f.key} className="insp-f"><span>{f.label}{f.required ? '' : ' (optional)'}</span>
               {f.long
                 ? <textarea rows={3} value={inputs[f.key] || ''} required={f.required} placeholder={f.placeholder} onChange={e => setInputs?.({ ...inputs, [f.key]: e.target.value })} />
@@ -171,9 +162,9 @@ export default function Inspector({
             </label>
           )}
 
-          {live && <p className="insp-note">Estimated collection cost: {spec.credits} Crustdata credits. Analysis uses up to 28 Gemini reviews on Vertex AI.</p>}
+          <p className="insp-note">Estimated collection cost: {spec.credits} Crustdata credits. Analysis uses up to 28 Gemini reviews on Vertex AI.</p>
           <button type="submit" className="insp-run" disabled={running || missing}>
-            {running ? 'Collecting evidence…' : live ? `Open a live ${spec.name} case` : `Run the ${spec.name} demo`}
+            {running ? 'Collecting evidence…' : `Open a live ${spec.name} case`}
           </button>
         </form>}
         {section === 'trace' && <>
@@ -186,8 +177,8 @@ export default function Inspector({
               </select>
             </label>
           )}
-          {events.length > 0 && <p>{runMode === 'demo' ? 'Synthetic investigation' : 'Live investigation'} · {events.filter(e=>e.agent_id && e.event === 'end').length} of {agents.length} agent reports</p>}
-          {record && <button type="button" className="trace-replay" onClick={onReplay}>{replaying ? 'Restart replay' : 'Replay handoffs'} ↻</button>}
+          {(running || record || events.length > 0) && <p>{record ? (replaying ? 'Recorded playback' : 'Recorded trace') : running ? 'Live investigation' : 'Interrupted investigation'} · {events.filter(e=>e.agent_id && e.event === 'end').length} of {agents.length} agent reports</p>}
+          {(record?.swarm_events?.length > 0 || record?.collection_events?.length > 0) && <button type="button" className="trace-replay" onClick={onReplay}>{replaying ? 'Restart replay' : 'Replay handoffs'} ↻</button>}
         </section>
         {record && (
           <section className="insp-sec insp-result" aria-live="polite">

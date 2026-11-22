@@ -39,7 +39,7 @@ function geometry(agents, reports) {
   })
 }
 
-export default function SwarmMap({agents,selected,onSelect,events,running,preview,playing,onToggle,reports=EMPTY_REPORTS}) {
+export default function SwarmMap({agents,selected,onSelect,events,running,idle,recorded,playing,onToggle,reports=EMPTY_REPORTS}) {
   const uid=useId().replace(/[^\w-]/g,'')
   const nodes=useMemo(()=>geometry(agents,reports),[agents,reports])
   const index=useMemo(()=>Object.fromEntries(nodes.flatMap(n=>[n,...n.children]).map(n=>[n.id,n])),[nodes])
@@ -104,7 +104,7 @@ export default function SwarmMap({agents,selected,onSelect,events,running,previe
       <g className="outer-orbits" fill="none"><circle cx="450" cy="365" r="284"/><circle cx="450" cy="365" r="184"/><circle cx="450" cy="365" r="111"/></g>
       {Array.from({length:120},(_,i)=><path key={i} className="degree" d={'M'+point(polar(i*Math.PI/60,279))+'L'+point(polar(i*Math.PI/60,i%5?281:285))}/>)}
       <g className="handoffs">{edges.map(([s,t],i)=>{
-        const hot=s.id===familyId||t.id===familyId, active=preview||status[t.id]==='running'
+        const hot=s.id===familyId||t.id===familyId, active=idle||status[t.id]==='running'
         const d=curve(s.pos,polar(s.angle,73),polar(t.angle,73),t.pos)
         const id=uid+'-edge-'+i
         return <g key={id}><path id={id} d={d} fill="none" stroke={hot?'#cfc4ac':'#aaa38e'} strokeOpacity={hot ? .86 : selected ? .13 : .44} strokeWidth={hot?1.15:.75}/>
@@ -126,7 +126,7 @@ export default function SwarmMap({agents,selected,onSelect,events,running,previe
           className={'agent-sector'+(focus?' selected':'')} style={{'--sector':color,'--order':n.i,opacity:!selected||n.id===familyId||edges.some(([a,b])=>(a.id===familyId&&b.id===n.id)||(b.id===familyId&&a.id===n.id))?1:.36}}>
           <path d={'M'+point(n.pos)+' L'+point(polar(n.angle-n.step*.45,272))+' '+point(polar(n.angle+n.step*.45,272))+'Z'} fill="transparent"/>
           {n.strips.map((v,k)=><g key={k}><path d={v.stem} fill="none" stroke={color} opacity={focus ? .84 : .45} strokeWidth=".8"/>
-            {(active || (preview&&k===2)) && playing && <circle r={active?2.6:1.65} fill="#ef976f">
+            {(active || (idle&&k===2)) && playing && <circle r={active?2.6:1.65} fill="#ef976f">
               <animateMotion path={v.stem} keyPoints="1;0" keyTimes="0;1" calcMode="linear" dur={(2.2+k*.4)+'s'} begin={(-n.i*.3-k*.5)+'s'} repeatCount="indefinite"/>
             </circle>}
             <path d={v.path} stroke={color} strokeWidth="1.25" opacity={focus ? 1 : .73}/></g>)}
@@ -151,7 +151,7 @@ export default function SwarmMap({agents,selected,onSelect,events,running,previe
           const color=focused||working?'#ff996b':C[lead.group]
           return <React.Fragment key={child.id}>
             <path d={path} className="specialist-link" stroke={color}/>
-            {playing&&(working||returning||preview)&&<circle r="2.2" fill="#ff9768" pointerEvents="none">
+            {playing&&(working||returning||idle)&&<circle r="2.2" fill="#ff9768" pointerEvents="none">
               <animateMotion path={path} keyPoints={returning?'1;0':'0;1'} keyTimes="0;1" calcMode="linear"
                 dur="1.5s" begin={-(lead.i+i)*.2+'s'} repeatCount="indefinite"/>
             </circle>}
@@ -180,6 +180,6 @@ export default function SwarmMap({agents,selected,onSelect,events,running,previe
       <button type="button" onClick={()=>camera.zoomBy(1.25)} aria-label="Zoom in">+</button>
     </div>
     <span id="map-control-hint" className="map-hint">Drag to pan · Scroll or pinch to zoom</span>
-    <button type="button" className="motion-control" onClick={onToggle} aria-label={playing?'Pause data flow animation':'Play data flow animation'}>{playing?'Ⅱ':'▷'} <span>{running?'Investigation activity':preview?'Workflow preview':'Case trace'}</span></button>
+    <button type="button" className="motion-control" onClick={onToggle} aria-label={playing?'Pause data flow animation':'Play data flow animation'}>{playing?'Ⅱ':'▷'} <span>{running?'Live investigation':idle?'Workflow map':recorded?'Recorded trace':'Interrupted trace'}</span></button>
   </div>
 }
