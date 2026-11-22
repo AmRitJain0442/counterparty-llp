@@ -11,7 +11,7 @@ const views = {
   flow: ['Discussion room', DiscussionRoom],
   live: ['Live investigation', LiveWorkbench],
   providers: ['Provider room', ProviderRoom],
-  archive: ['Estate archive', EstateArchive],
+  archive: ['Filed estates', EstateArchive],
 }
 function Workspace() {
   const getTab=()=>Object.hasOwn(views,location.hash.slice(1))?location.hash.slice(1):'flow'
