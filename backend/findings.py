@@ -6,10 +6,11 @@ dates a card. A filing date, role start or headcount point dates an observation.
 import json
 import re
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from .estate import MIN_COVERAGE, MIN_GROUP, Period, _credits, _day, _domain, _history, _identity, _role_date
 from .providers import OPERATIONS
+from .vendor import vendor_records
 
 
 def _dict(value):
@@ -85,6 +86,7 @@ class _Review:
         self.signals = []
         self.steps = []
         self.rows = {}
+        self.proposition = None
         for step in _list(raw.get("steps")):
             if _known(step):
                 self.step(step["operation"], _status(step.get("status")), "Provider collection")
@@ -102,13 +104,25 @@ class _Review:
     def card(self, row, label, detail, *, observed=None, url=None):
         op = row["operation"]
         # Providers allocate IDs per lane. Allocate public IDs after collection.
-        card = dict(id=f"live-{len(self.evidence) + 1}", source=row["provider"], operation=op,
+        provider = row["provider"]
+        card = dict(id=f"live-{len(self.evidence) + 1}", source="Crustdata" if provider == "crustdata" else provider,
+                    provider=provider, operation=op,
                     label=label, detail=detail, mode="LIVE", as_of=_retrieved(row),
                     url=url or SOURCES[op][1], status="ok")
         if observed:
             card["observed_on"] = observed.isoformat()
         self.evidence.append(card)
         return card
+
+    def observe(self, card, claim, *, primary=False):
+        """Only an observed fact can cite a card at the proposition gate."""
+        if not card["as_of"]:
+            return
+        card["claim"] = claim
+        self.signals.append(dict(type="claim_observation", claim=claim, evidence_id=card["id"],
+                                 provider=card["provider"], operation=card["operation"], status="ok"))
+        if primary and self.proposition is None:
+            self.proposition = claim
 
 
 def _match(row, kind):
@@ -154,7 +168,8 @@ def _company(review, subject, inputs):
     elif kind == "crustdata_company_id":
         bound = bound and str(echo) == str(cid)
     if not cid or not bound:
-        review.step("Company identity", "unresolved", "A unique company tied to the intake identifier is required.")
+        status = "unresolved" if review.rows.get(primary) else "unknown"
+        review.step("Company identity", status, "A unique company tied to the intake identifier is required.")
         return None, [], "", {}
     review.card(row, "Company identity", "A unique company record matched the intake identifier.")
     if primary == "company_enrich" or not review.rows.get("company_enrich"):
@@ -213,7 +228,8 @@ def _filings(review, subject, inputs, company_name, domains):
         link = url
         if isinstance(accession, str) and re.fullmatch(r"[0-9]{10}-[0-9]{2}-[0-9]{6}", accession):
             link = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accession.replace('-', '')}/{accession}-index.htm"
-        review.card(row, f"8-K Item {item}", detail, observed=filed, url=link)
+        card = review.card(row, f"8-K Item {item}", detail, observed=filed, url=link)
+        review.observe(card, f"CIK {cik} filed {form} Item {item} on {filed}.", primary=True)
     if not latest:
         review.step("SEC filings", "unknown", "The returned index supplied no dated Item 5.02 or 4.01 filing for review.")
 
@@ -222,8 +238,18 @@ def _person(review, inputs):
     row = review.one("person_enrich")
     env, person = _match(row, "person")
     requested = _profile_key(inputs.get("person_url"))
-    if not requested or _profile_key(env.get("matched_on")) != requested:
-        review.step("Profile identity", "unresolved", "The requested profile has no unique, confident match.")
+    bound = (requested and _profile_key(env.get("matched_on")) == requested
+             and env.get("match_type", "professional_network_profile_url") == "professional_network_profile_url")
+    if review.rows.get("person_identify"):
+        identity_env, identity = _match(review.one("person_identify"), "person")
+        pid = identity.get("crustdata_person_id")
+        bound = (bound and _profile_key(identity_env.get("matched_on")) == requested
+                 and identity_env.get("match_type", "professional_network_profile_url") == "professional_network_profile_url"
+                 and type(pid) is int and pid > 0 and type(person.get("crustdata_person_id")) is int
+                 and pid == person["crustdata_person_id"])
+    if not bound:
+        status = "unresolved" if review.rows.get("person_enrich") else "unknown"
+        review.step("Profile identity", status, "The requested profile has no unique, confident match.")
         return {}, None, False
     refresh = _day(person.get("updated_at") or _dict(person.get("basic_profile")).get("last_updated"))
     retrieved = _day(row.get("as_of"))
@@ -273,6 +299,7 @@ def _sending_domain(review, inputs, domains):
     sender = inputs.get("sender_domain") or inputs.get("domain")
     ldh = record.get("ldhName")
     if (not isinstance(sender, str) or not isinstance(ldh, str) or not _domain(ldh)
+            or not re.fullmatch(r"[A-Za-z0-9.-]{1,254}", ldh)
             or ldh.rstrip(".").casefold() != sender.rstrip(".").casefold()
             or record.get("objectClassName", "domain") != "domain"):
         review.step("Sender domain identity", "unresolved", "The RDAP record could not be tied to the queried domain.")
@@ -287,12 +314,12 @@ def _sending_domain(review, inputs, domains):
         return None
     age = (retrieved - registered).days
     detail = f"RDAP records registration on {registered}, {age} days before collection."
-    card = review.card(row, "Domain registration", detail, observed=registered)
+    card = review.card(row, "Domain registration", detail, observed=registered,
+                       url=f"https://lookup.icann.org/en/lookup?name={ldh.rstrip('.').lower()}")
     # The registered domain and the vendor's published domain have different
     # roles in a payment inquiry. A vendor's own recent domain is context.
     if inputs.get("sender_domain") and domains and _domain(sender) not in domains and age <= 30:
-        return card
-    return None
+        review.observe(card, f"The sending domain was registered on {registered}.")
 
 
 def _bank(review, inputs):
@@ -306,7 +333,8 @@ def _bank(review, inputs):
         value = data.get(key)
         if isinstance(value, str) and re.fullmatch(r"[^\W\d_][\w .,&'()-]{0,80}", value):
             detail += f" {label} listed as {value}."
-    review.card(row, "Bank branch lookup", detail + " Account ownership requires independent confirmation.")
+    review.card(row, "Bank branch lookup", detail + " Account ownership requires independent confirmation.",
+                url=f"https://ifsc.razorpay.com/{code}")
 
 
 def _payment(review, inputs, cid, domains, consent):
@@ -328,6 +356,46 @@ def _payment(review, inputs, cid, domains, consent):
                        observed=start.first if start.first == start.last else None)
     if start.first != start.last:
         card.update(observed_from=str(start.first), observed_through=str(start.last))
+    if fresh:
+        review.observe(card, f"The matched contact started a subsequent external job on {_period_text(start)}.",
+                       primary=True)
+
+
+def _vendor_domain(review, inputs, domains):
+    """Only matching, independent records can carry the live callback proposition."""
+    identify, registry = review.one("company_identify"), review.one("brreg")
+    if not identify or not registry or any(s["status"] == "unresolved" for s in review.steps):
+        return
+    sender, vendor = _domain(inputs.get("sender_domain")), _domain(inputs.get("domain"))
+    if not sender or vendor not in domains or any(sender == d or sender.endswith("." + d) for d in domains):
+        return
+    org = inputs.get("orgnr")
+    record = _dict(registry.get("data"))
+    if (not isinstance(org, str) or not re.fullmatch(r"[0-9]{9}", org)
+            or record.get("organisasjonsnummer") != org or not _domain(record.get("hjemmeside"))):
+        return
+    _, company = _match(identify, "company")
+    basic = _dict(company.get("basic_info"))
+    company_domain = _domain(basic.get("primary_domain"))
+    if not company_domain or not _issuer_name(basic.get("name")):
+        return
+    # The two observations describe the records returned during this inquiry.
+    # A markedly older lookup or indexed profile cannot establish the current pair.
+    observed = [_day(row.get("as_of")) for row in (identify, registry)]
+    refreshed = _day(company.get("updated_at"))
+    if (not all(observed) or max(observed) - min(observed) > timedelta(days=1)
+            or refreshed and not timedelta(0) <= observed[0] - refreshed <= timedelta(days=30)):
+        return
+    rows = [{**identify, "source": SOURCES["company_identify"][1]},
+            {**registry, "source": f"{SOURCES['brreg'][1]}/{org}"}]
+    cards = vendor_records({"domain": vendor, "sender_domain": sender, "orgnr": org},
+                           {"basic_info": {"name": basic["name"], "primary_domain": company_domain}}, rows)
+    for card, row in zip(cards, rows):
+        card.update(provider=row["provider"], status="ok", operation=row["operation"])
+        review.evidence.append(card)
+        review.observe(card, card["claim"])
+    if cards:
+        review.proposition = cards[0]["claim"]
 
 
 @dataclass(frozen=True)
@@ -414,7 +482,7 @@ def _intersects(a, b):
     return max(a.first, b.first) <= min(a.last, b.last)
 
 
-def _employment_dates(review, reference, claim):
+def _employment_dates(review, reference, claim, fresh):
     if not reference:
         review.step("Claimed employment dates", "unknown", "No dated role at the matched employer could be compared.")
         return []
@@ -432,7 +500,9 @@ def _employment_dates(review, reference, claim):
     else:
         closest = min(reference, key=lambda s: max(window.first - s.last, s.first - window.last))
         detail = prefix + f"No documented overlap. The closest recorded interval is {_period_text(closest)}."
-    review.card(review.one("person_enrich"), "Claimed employment dates", detail)
+    card = review.card(review.one("person_enrich"), "Claimed employment dates", detail)
+    if fresh and window in overlap:
+        review.observe(card, f"The matched profile records employment throughout {_period_text(window)}.", primary=True)
     return overlap
 
 
@@ -473,14 +543,11 @@ def _headcounts(company, department, cutoff):
     """Return actual dated estimates for one population, excluding conflicting points."""
     headcount = _dict(company.get("headcount"))
     series = headcount.get("timeseries")
-    current = headcount.get("total")
     if department:
         functions = _dict(_dict(headcount.get("by_function_timeseries")).get("CURRENT_FUNCTION"))
         series = next((v for k, v in functions.items() if _name(k) == _name(department)), None)
-        current = next((v for k, v in _dict(headcount.get("by_role_absolute")).items()
-                        if _name(k) == _name(department)), None)
     points = {}
-    for point in [*_list(series), {"date": company.get("updated_at"), "employee_count": current}]:
+    for point in _list(series):
         day = _day(_dict(point).get("date"))
         size = _dict(point).get("employee_count")
         if cutoff and day and day <= cutoff and type(size) is int and size >= 0:
@@ -497,6 +564,16 @@ def _claim_headcount(review, company, claim):
     candidates = _headcounts(company, claim.department, _day(row.get("as_of")))
     if claim.window:
         candidates = [(d, s) for d, s in candidates if claim.window.first <= d <= claim.window.last]
+    else:
+        headcount = _dict(company.get("headcount"))
+        current = headcount.get("total")
+        if claim.department:
+            current = next((v for k, v in _dict(headcount.get("by_role_absolute")).items()
+                            if _name(k) == _name(claim.department)), None)
+        if type(current) is int and current >= MIN_GROUP:
+            detail += f"The retrieved profile lists {current} {population} profiles. The claim needs a date for comparison."
+            review.card(row, "Claimed headcount", detail)
+            return
     if not candidates or candidates[-1][1] < MIN_GROUP:
         review.step("Claimed headcount", "unknown", detail + f"No publishable dated {population} estimate for comparison.")
         return
@@ -507,7 +584,9 @@ def _claim_headcount(review, company, claim):
         detail += f"At this point in the claimed period, the estimate was {relation} the claimed size."
     else:
         detail += "The claim needs a date to establish whether the periods match."
-    review.card(row, "Claimed headcount", detail + " Reporting lines require separate evidence.", observed=day)
+    card = review.card(row, "Claimed headcount", detail + " Reporting lines require separate evidence.", observed=day)
+    if claim.window and count >= MIN_GROUP:
+        review.observe(card, f"The {population} estimate on {day} was {relation} the claimed size of {count}.", primary=True)
 
 
 def _candidate(review, inputs, cid, domains, company, consent):
@@ -519,31 +598,107 @@ def _candidate(review, inputs, cid, domains, company, consent):
         return
     if claim.headcount is not None:
         _claim_headcount(review, company, claim)
-    person, cutoff, _ = _person(review, inputs)
+    person, cutoff, fresh = _person(review, inputs)
     if not person or not cutoff:
         return
     roles, _ = _history(person)
-    dates = _employment_dates(review, _ranges(roles, cid, domains, cutoff), claim)
+    dates = _employment_dates(review, _ranges(roles, cid, domains, cutoff), claim, fresh)
     _colleagues(review, person, dates, cid, domains)
     if not claim.window and claim.headcount is None:
         review.step("Candidate claim", "unknown", "A reviewer needs a dated or quantitative claim to compare.")
 
 
+def _workforce(review, company):
+    row = review.one("company_enrich")
+    cutoff = _day(row.get("as_of"))
+    for department in (None, "Finance"):
+        points = _headcounts(company, department, cutoff)
+        if not points or points[-1][1] < MIN_GROUP:
+            continue
+        population = department or "Whole-company"
+        day, count = points[-1]
+        observation = f"{population} headcount was estimated at {count} profiles on {day}."
+        detail = observation
+        if len(points) >= 2 and points[-2][1] >= MIN_GROUP:
+            prior, previous = points[-2]
+            detail += f" The preceding returned point was {previous} on {prior}."
+        card = review.card(row, f"{population} headcount", detail, observed=day)
+        review.observe(card, observation, primary=True)
+
+
+def _executive_starts(review, company, cid, domains):
+    # Company Enrich embeds PersonProfileEmployer, whose keys differ from
+    # Person Enrich. Keep only dated employer roles, never names or biographies.
+    row = review.one("company_enrich")
+    cutoff = _day(row.get("as_of"))
+    starts = {}
+    for profile in _list(_dict(company.get("people")).get("cxos")):
+        profile = _dict(profile)
+        pid = profile.get("crustdata_person_id")
+        if type(pid) is not int or pid <= 0:
+            continue
+        details = _dict(_dict(profile.get("experience")).get("employment_details"))
+        for role in _list(details.get("current")):
+            role = _dict(role)
+            ids = {str(i) for i in _list(role.get("employer_company_id"))}
+            hosts = {_domain(h) for h in _list(role.get("employer_website"))}
+            matches = ids == {str(cid)} if ids else bool(hosts.intersection(domains))
+            start, _ = _role_date(role.get("employee_start_date"))
+            if matches and cutoff and start and start.last <= cutoff:
+                starts.setdefault(pid, set()).add(start)
+    dated = [next(iter(s)) for s in starts.values() if len(s) == 1]
+    if len(dated) >= MIN_GROUP:
+        detail = (f"{len(dated)} distinct profiles in the executive roster have dated roles at this company. "
+                  f"Those reported starts range from {min(s.first for s in dated)} to {max(s.last for s in dated)}.")
+        review.card(row, "Executive role starts", detail)
+
+
+def _job_postings(review, cid):
+    row = review.one("job_search")
+    cutoff = _day(row.get("as_of"))
+    dates = []
+    for job in _list(_dict(row.get("data")).get("job_listings")):
+        job = _dict(job)
+        company_id, _ = _identity(_dict(job.get("company")), None)
+        posted = _day(_dict(job.get("metadata")).get("date_added"))
+        if company_id == cid and posted and cutoff and posted <= cutoff:
+            dates.append(posted)
+    if dates:
+        day = max(dates)
+        detail = f"The returned index includes a job posting for this company dated {day}."
+        review.card(row, "Indexed job posting", detail, observed=day)
+
+
 def interpret(desk, subject, inputs, raw):
-    """Project one run_live response (or its joined lanes) into ledger-safe findings."""
+    """Project a run_live response or its joined lanes into ledger-safe findings.
+
+    Candidate claim accepts the intake text (e.g. "Led 40 engineers, 2023 to
+    2025"), or a mapping/JSON object with start_date, end_date, headcount and
+    department. The separate claim_start, claim_end, claim_headcount and
+    claim_department inputs express the same fields. No free text is retained.
+    """
     inputs, raw = _dict(inputs), _dict(raw)
     review = _Review(raw)
     cid, domains, company_name, company = _company(review, subject, inputs)
     if desk == "company":
         _filings(review, subject, inputs, company_name, domains)
+        if company:
+            _workforce(review, company)
+            _executive_starts(review, company, cid, domains)
+        if cid:
+            _job_postings(review, cid)
     consent = inputs.get("consent") is not False and not any(
         _dict(s).get("type") == "consent_required" for s in _list(raw.get("signals")))
     if not consent:
         review.step("Profile consent", "skipped", "Profile evidence requires consent.")
     if desk == "payment":
         _payment(review, inputs, cid, domains, consent)
+        _vendor_domain(review, inputs, domains)
     elif desk == "candidate":
         _candidate(review, inputs, cid, domains, company, consent)
     charges = [_credits(_dict(c).get("actual")) for c in _list(raw.get("credits"))]
-    return dict(evidence=review.evidence, signals=review.signals, steps=review.steps, flows=[],
-                credits=float(sum(charges)) if charges and all(c is not None for c in charges) else None)
+    result = dict(mode="live", evidence=review.evidence, signals=review.signals, steps=review.steps, flows=[],
+                  credits=float(sum(charges)) if charges and all(c is not None for c in charges) else None)
+    if review.proposition:
+        result["proposition"] = review.proposition
+    return result

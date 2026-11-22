@@ -12,7 +12,6 @@ from .findings import interpret
 from .estate import estate_evidence
 from .destination import screen_destination
 from .progress import report
-from .vendor import vendor_records
 from .forecast import forecast_window
 
 
@@ -97,14 +96,6 @@ def collect_live(desk, subject, consent=False, inputs=None):
     result["steps"].extend(step for step in interpreted["steps"] if step not in result["steps"])
     result["signals"].extend(interpreted["signals"])
     result["proposition"] = interpreted.get("proposition")
-    if desk == "payment" and len(matches) == 1:
-        cards = vendor_records(safe, company, raw["evidence"])
-        if cards:
-            result["evidence"].extend(cards)
-            result["proposition"] = cards[0]["claim"]
-            result["signals"].extend({"type": "claim_observation", "claim": c["claim"],
-                                      "evidence_id": c["id"]} for c in cards)
-    result.update(mode="live", subject=subject, consent=consent)
     if desk == "company" and len(matches) == 1 and isinstance(cid, int) and not any(
             s.get("status") == "unresolved" for s in interpreted["steps"]):
         response = next((e for e in raw["evidence"] if e["operation"] == "company_enrich"), {})
