@@ -88,12 +88,9 @@ def run_council(desk, evidence, verdict, emit, mode):
                 detail += 'Reviewed inputs from ' + ', '.join(agents[d]['name'] for d in deps) + '.'
                 assessment = 'rehearsal'
             else:
-                context = [dict(id=r['id'], label=r.get('label', ''),
-                                detail=r.get('detail', ''), as_of=r.get('as_of', ''),
-                                source=r.get('source', '')) for r in selected]
                 dependencies = [dict(label=f'Dependency {r["agent_id"]}', detail=f"{r.get('assessment') or 'Observation'}: {r['detail']}",
                                  source=', '.join(r['refs'])) for r in upstream]
-                context = [dict(label='Bounded assignment', detail=agent['task'], source='Council'), *dependencies, *context]
+                context = [dict(label='Bounded assignment', detail=agent['task'], source='Council'), *dependencies, *rows]
                 role = 'counsel' if key.startswith('challenger') else 'analyst'
                 review, status = draft_note(desk, context, verdict, 'partner' if key == 'partner' else role, persona=agent['persona'], mandate=agent['task'])
                 if review:
@@ -154,12 +151,10 @@ def run_council(desk, evidence, verdict, emit, mode):
                 review = demo_specialist(spec, rows, upstream, verdict)
                 status = 'complete'
             else:
-                context = [dict(id=r['id'], label=r.get('label', ''), detail=r.get('detail', ''),
-                                source=r.get('source', ''), as_of=r.get('as_of', '')) for r in rows]
-                context += [dict(label=f"Dependency {r['agent_id']}",
+                dependencies = [dict(label=f"Dependency {r['agent_id']}",
                                  detail=f"{r['status']} / {r.get('assessment')}: {r['detail']}",
                                  source=', '.join(r['refs'])) for r in upstream]
-                review, status = draft_note(desk, context, verdict, 'analyst',
+                review, status = draft_note(desk, [*dependencies, *rows], verdict, 'analyst',
                                             persona=spec['persona'], mandate=spec['task'])
             if review is None:
                 result = failure(agent, status)
