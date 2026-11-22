@@ -4,6 +4,8 @@ Notes are advisory; the supplied deterministic verdict is never recomputed.
 """
 from concurrent.futures import ThreadPoolExecutor
 from .drafting import draft_note
+from .personas import PARENT_PERSONAS, SPECIALISTS, demo_specialist
+from threading import RLock
 
 
 _SPECS = (
@@ -34,9 +36,16 @@ _DEPENDENCIES = {key: deps for stage in _STAGES for key, deps in stage}
 
 
 def agents_for(desk):
-    return [dict(id=key, name=name, group=group, task=f'{desk}: {task}', lane=lane,
-                 depends_on=list(_DEPENDENCIES[key]))
-            for key, name, group, task, lane in _SPECS]
+    leads = [dict(id=key, name=name, group=group, task=f'{desk}: {task}', lane=lane,
+                  persona=PARENT_PERSONAS[key], parent_id=None,
+                  specialist_ids=[s['id'] for s in SPECIALISTS[key]],
+                  depends_on=list(_DEPENDENCIES[key]))
+             for key, name, group, task, lane in _SPECS]
+    children = [dict(id=s['id'], name=s['name'], group=a['group'], task=s['task'],
+                     lane=a['lane'], persona=s['persona'], parent_id=a['id'],
+                     specialist_ids=[], depends_on=a['depends_on'][:])
+                for a in leads for s in SPECIALISTS[a['id']]]
+    return leads + children
 
 
 def run_council(desk, evidence, verdict, emit, mode):
@@ -51,6 +60,11 @@ def run_council(desk, evidence, verdict, emit, mode):
     rows = [dict(row) for row in evidence if row.get('id')]
     material = [r for r in rows if r.get('status', 'ok') in ('ok', 'complete') and (r.get('detail') or r.get('label'))]
     reports = {}
+    event_lock = RLock()
+    sink = emit
+    def emit(event):
+        with event_lock:
+            sink(event)
     agents = {a['id']: a for a in agents_for(desk)}
 
 
@@ -65,7 +79,7 @@ def run_council(desk, evidence, verdict, emit, mode):
         status = 'complete'
         assessment = None
         if key.startswith(('analyst_', 'challenger_')) or key == 'partner':
-            upstream = [reports[d] for d in deps]
+            upstream = [reports[d] for d in deps] + [reports[c] for c in agent["specialist_ids"]]
             if any(r['status'] != 'complete' for r in upstream):
                 detail, status = 'Required council output unavailable; review blocked.', 'blocked'
             elif replay:
@@ -81,7 +95,7 @@ def run_council(desk, evidence, verdict, emit, mode):
                                  source=', '.join(r['refs'])) for r in upstream]
                 context = [dict(label='Bounded assignment', detail=agent['task'], source='Council'), *dependencies, *context]
                 role = 'counsel' if key.startswith('challenger') else 'analyst'
-                review, status = draft_note(desk, context, verdict, 'partner' if key == 'partner' else role)
+                review, status = draft_note(desk, context, verdict, 'partner' if key == 'partner' else role, persona=agent['persona'], mandate=agent['task'])
                 if review:
                     detail, assessment, refs = review['note'], review['assessment'], review['refs']
                 else:
@@ -107,25 +121,75 @@ def run_council(desk, evidence, verdict, emit, mode):
         else:
             detail = f'{agent["task"]}: {len(selected)} observations; sources: ' + ', '.join(
                 dict.fromkeys(str(r.get('source', 'unknown')) for r in selected))
+        children = [reports[c] for c in agent['specialist_ids']]
+        if children:
+            detail += ' Specialist observations: ' + '; '.join(
+                f"{c['name']} [{c['status']}, {c.get('assessment')}]: {c['detail']}" for c in children)
+            refs = list(dict.fromkeys(refs + [ref for c in children for ref in c['refs']]))
+            if any(c['status'] != 'complete' or c.get('assessment') == 'needs_evidence' for c in children):
+                assessment = 'needs_evidence'
         return dict(agent_id=key, name=agent['name'], group=agent['group'], status=status,
-                    detail=detail, refs=refs, assessment=assessment, depends_on=list(deps))
+                    detail=detail, refs=refs, assessment=assessment, depends_on=list(deps),
+                    persona=agent['persona'], parent_id=None, specialist_ids=agent['specialist_ids'])
 
-    with ThreadPoolExecutor(max_workers=5) as pool:
+    def event(kind, agent, **extra):
+        emit(dict(event=kind, agent_id=agent['id'], name=agent['name'], group=agent['group'],
+                  depends_on=agent['depends_on'], parent_id=agent['parent_id'],
+                  persona=agent['persona'], specialist_ids=agent['specialist_ids'],
+                  mode='replay' if replay else 'live', replay=replay, **extra))
+
+    def failure(agent, exc):
+        return dict(agent_id=agent['id'], name=agent['name'], group=agent['group'],
+                    detail=f'Council task unavailable: {exc}', refs=[], status='unavailable',
+                    assessment='needs_evidence', parent_id=agent['parent_id'],
+                    persona=agent['persona'], depends_on=agent['depends_on'],
+                    specialist_ids=agent['specialist_ids'])
+
+    def child_work(spec):
+        agent = agents[spec['id']]
+        event('start', agent, detail=agent['task'], status='running')
+        try:
+            upstream = [reports[d] for d in agent['depends_on']]
+            if replay:
+                review = demo_specialist(spec, rows, upstream, verdict)
+                status = 'complete'
+            else:
+                context = [dict(id=r['id'], label=r.get('label', ''), detail=r.get('detail', ''),
+                                source=r.get('source', ''), as_of=r.get('as_of', '')) for r in rows]
+                context += [dict(label=f"Dependency {r['agent_id']}",
+                                 detail=f"{r['status']} / {r.get('assessment')}: {r['detail']}",
+                                 source=', '.join(r['refs'])) for r in upstream]
+                review, status = draft_note(desk, context, verdict, 'analyst',
+                                            persona=spec['persona'], mandate=spec['task'])
+            if review is None:
+                result = failure(agent, status)
+            else:
+                result = dict(failure(agent, ''), detail=review['note'], refs=review['refs'],
+                              assessment=review['assessment'], status=status)
+        except Exception as exc:
+            result = failure(agent, type(exc).__name__)
+        reports[agent['id']] = result
+        event('end', agent, **{k:v for k,v in result.items() if k not in
+              ('agent_id','name','group','depends_on','parent_id','persona','specialist_ids')})
+        return result
+
+    # Separate executors: waiting leads cannot occupy a child's execution slot.
+    with ThreadPoolExecutor(max_workers=6) as children, ThreadPoolExecutor(max_workers=5) as leads:
+        def parent_work(key, deps):
+            agent = agents[key]
+            event('start', agent, detail=agent['task'], status='running')
+            futures = [children.submit(child_work, spec) for spec in SPECIALISTS[key]]
+            for future in futures:
+                future.result()
+            try:
+                result = work(key, deps)
+            except Exception as exc:
+                result = failure(agent, type(exc).__name__)
+            reports[key] = result
+            event('end', agent, **{k:v for k,v in result.items() if k not in
+                  ('agent_id','name','group','depends_on','parent_id','persona','specialist_ids')})
         for stage in _STAGES:
-            pending = []
-            for key, deps in stage:
-                emit(dict(event='start', agent_id=key, name=agents[key]['name'], group=agents[key]['group'],
-                          detail=agents[key]['task'], status='running', depends_on=deps,
-                          mode='replay' if replay else 'live', replay=replay))
-                pending.append((key, pool.submit(work, key, deps)))
-            for key, future in pending:
-                try:
-                    result = future.result()
-                except Exception as exc:
-                    a = agents[key]
-                    result = dict(agent_id=key, name=a['name'], group=a['group'],
-                                  status='unavailable', detail=f'Council task failed: {type(exc).__name__}',
-                                  refs=[], depends_on=next(d for k, d in stage if k == key))
-                reports[key] = result
-                emit(dict(event='end', **result, mode='replay' if replay else 'live', replay=replay))
+            futures = [leads.submit(parent_work, key, deps) for key, deps in stage]
+            for future in futures:
+                future.result()
     return [reports[a['id']] for a in agents_for(desk)]
