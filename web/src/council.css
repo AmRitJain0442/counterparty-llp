@@ -19,3 +19,14 @@
 .human-review label{display:grid;gap:6px}.human-review select,.human-review textarea{padding:10px;font:inherit;background:#211f18;color:#eee6d5;border:1px solid #524d41}
 .human-review textarea{min-height:78px}.human-review button{justify-self:start;padding:10px 16px;cursor:pointer;background:#e5d7b9;color:#221f18;border:0}
 .human-review button:disabled {opacity:.5}
+
+.room-trace {border-top:1px solid #494234;padding:20px 0;margin-top:22px}
+.room-trace>a {color:#f3a07a}
+.room-trace>div {display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:20px}
+.room-trace h2 {text-transform:capitalize;color:#d6c8aa;font:600 14px monospace}
+.room-trace details {border-top:1px solid #433c30;padding:9px 0;font-size:13px}
+.room-trace summary {cursor:pointer}.room-trace summary small {color:#ac9f83}
+.room-trace p {color:#b9ae97;overflow-wrap:anywhere}
+.room-evidence-nav {display:flex;flex-wrap:wrap;gap:6px;margin-top:18px}
+.room-evidence-nav button {background:#211f18;color:#d6cbb2;border:1px solid #4b4334;cursor:pointer;padding:6px 9px}
+.room-evidence-nav button[aria-pressed=true] {color:#f49d73;border-color:#a37759}

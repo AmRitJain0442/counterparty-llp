@@ -9,9 +9,6 @@ const roles = [
   ['counsel', 'Opposing counsel', 'Test the proposed finding', '#fc8763'],
   ['partner', 'Partner review', 'File the decision', '#c6afe0'],
 ]
-const positions = [[95,145],[270,77],[270,217],[456,146],[634,146]]
-const edges = [[0,1],[0,2],[1,3],[2,3],[3,4]]
-
 function observations(record, role) {
   const items = record?.evidence || []
   if (role === 'counsel') return [
@@ -47,26 +44,17 @@ export default function DiscussionRoom({initialCase}) {
       {records.length > 0 && <label>Case file<select value={selected} onChange={e => setSelected(e.target.value)}>
         {records.map(row => <option key={row.id} value={row.id}>{row.subject} · {row.id.slice(0,6)}</option>)}
       </select></label>}</div>
-    <p>Follow a filed case from identity resolution through independent review. Select a desk to inspect its evidence.</p>
-    <div className="council-panel"><svg viewBox="0 0 720 302" role="group" aria-label="Select a desk on the evidence flow">
-      <defs><pattern id="roomGrid" width="16" height="16" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".8" fill="#504c42"/></pattern></defs>
-      <rect width="720" height="302" fill="url(#roomGrid)" />
-      {edges.map(([a,b]) => {
-        const [x,y]=positions[a], [u,v]=positions[b], mid=(x+u)/2
-        return <path key={a+'-'+b} d={`M${x} ${y} C${mid} ${y}, ${mid} ${v}, ${u} ${v}`}
-          fill="none" stroke={focus===a || focus===b ? roles[b][3] : '#5b574b'} strokeWidth="1.7"/>
-      })}
-      {roles.map(([key,name,,color],i) => {
-        const [x,y]=positions[i], active=i===focus
-        return <g key={key} transform={`translate(${x},${y})`} tabIndex="0" role="button" aria-label={name}
-          aria-pressed={active} onClick={() => setFocus(i)} onKeyDown={e => {
-            if(['Enter',' '].includes(e.key)){e.preventDefault();setFocus(i)}
-          }}><circle r="28" fill="#171610" stroke={color} strokeWidth={active ? 2.7 : 1}/>
-          <path d="m0 -12 11 6 v12 l-11 6 -11 -6 v-12z" stroke={color} fill={active?color:'none'}/>
-          <text y="48" textAnchor="middle" fill={active?'#fff1da':'#bcb5a2'}>{name}</text>
-        </g>
-      })}
-    </svg></div>
+    {record?.swarm_reports?.length > 0 && <section className="room-trace">
+      <a href={'/?case='+encodeURIComponent(record.id)+'#swarm'}>Open this case in the swarm inspector ↗</a>
+      <p>{record.swarm_reports.length} agent reports · {record.swarm_events.filter(e=>e.event==='end').length} completed handoffs</p>
+      <div>{['identity','discovery','challenge','decision'].map(group=><section key={group}>
+        <h2>{group}</h2>
+        {record.swarm_reports.filter(a=>a.group===group).map(a=><details key={a.agent_id}><summary>{a.name} <small>{a.status}</small></summary><p>{a.detail}</p></details>)}
+      </section>)}</div></section>}
+    {record && !record.swarm_reports?.length && <p>This case predates agent tracing. Its filed evidence is available below.</p>}
+    <div className="room-evidence-nav" aria-label="Filed evidence by role">
+      {roles.map(([id,name],i)=><button key={id} aria-pressed={focus===i} onClick={()=>setFocus(i)}>{name}</button>)}
+    </div>
     <section className="council-notes" aria-live="polite"><div><small style={{color:roles[focus][3]}}>{roles[focus][1]}</small>
       <h2>{roles[focus][2]}</h2>{record && <p>{record.subject} · {record.mode.toUpperCase()}</p>}</div>
       <div>{error || (!record ? 'Run a desk investigation to see its evidence here.' :

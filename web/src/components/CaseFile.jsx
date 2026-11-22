@@ -108,6 +108,7 @@ export default function CaseFile({ record, loading, error }) {
             <span className={'pill ' + (record.mode === 'live' ? 'tone-clear' : 'tone-sign')}>{record.mode}</span>
             <span className="chip">As of {formatDate(record.as_of, true)}</span>
             <span className="chip">{formatCredits(record.credits)}</span>
+            {record.swarm_events?.length > 0 && <a className="chip" href={'/?case='+encodeURIComponent(record.id)+'#swarm'}>Inspect swarm trace ↗</a>}
           </div>
         </div>
       </header>
