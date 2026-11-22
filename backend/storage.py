@@ -7,8 +7,9 @@ import json
 import os
 import re
 import sqlite3
+import time
 from contextlib import closing, contextmanager
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 
@@ -271,3 +272,101 @@ def reopen_from_watch(event_id: str) -> bool:
         return True
 
     return _ledger().atomic(apply)
+
+
+@contextmanager
+def _local_cache():
+    with _connection() as conn:
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS batch_cache (
+                 cache_key TEXT PRIMARY KEY, as_of TEXT NOT NULL,
+                 data_json TEXT NOT NULL, expires_at REAL NOT NULL)"""
+        )
+        yield conn
+
+
+def _cache_key(key):
+    if not isinstance(key, str) or not key.strip():
+        raise ValueError("batch cache key must be a nonempty scoped string")
+    return _key(key)
+
+
+def _cache_table():
+    table = os.getenv("BIGQUERY_CACHE_TABLE")
+    # BigQuery supports parameters for values only. Validate the configured identifier.
+    if table and not re.fullmatch(r"[a-z][a-z0-9-]*\.[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*", table):
+        raise ValueError("BIGQUERY_CACHE_TABLE must be project.dataset.table")
+    return table
+
+
+@lru_cache(maxsize=4)
+def _bigquery(project, location):
+    from google.cloud import bigquery
+
+    return bigquery.Client(project=project, location=location)
+
+
+def _cache_query(table, sql, parameters):
+    from google.cloud import bigquery
+
+    client = _bigquery(os.getenv("GOOGLE_CLOUD_PROJECT") or table.split(".")[0], os.getenv("BIGQUERY_LOCATION"))
+    config = bigquery.QueryJobConfig(query_parameters=[
+        bigquery.ScalarQueryParameter(name, kind, value) for name, kind, value in parameters
+    ])
+    return client.query(sql, job_config=config).result(timeout=45)
+
+
+def put_cached_batch(key: str, data, *, as_of: str, ttl_seconds: int) -> None:
+    """Cache a scoped private batch with its source date and a TTL of up to 30 days."""
+    cache_key = _cache_key(key)
+    if type(ttl_seconds) is not int or not 1 <= ttl_seconds <= 30 * 86400:
+        raise ValueError("batch TTL must be 1 second to 30 days")
+    try:
+        if len(as_of) == 10:
+            date.fromisoformat(as_of)
+        elif datetime.fromisoformat(as_of.replace("Z", "+00:00")).tzinfo is None:
+            raise ValueError
+    except (TypeError, ValueError, AttributeError):
+        raise ValueError("as_of must be an ISO date or timestamp with a timezone") from None
+    encoded = _json(data)
+    table = _cache_table()
+    if table:
+        _cache_query(table,
+            f"""INSERT INTO `{table}` (cache_key, as_of, data_json, stored_at, expires_at)
+                VALUES (@key, @as_of, @data, CURRENT_TIMESTAMP(),
+                        TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL @ttl SECOND))""",
+            [("key", "STRING", cache_key), ("as_of", "STRING", as_of),
+             ("data", "STRING", encoded), ("ttl", "INT64", ttl_seconds)])
+    elif os.environ.get("LEDGER_BACKEND", "sqlite").lower() == "sqlite":
+        with _local_cache() as conn:
+            now = time.time()
+            conn.execute("DELETE FROM batch_cache WHERE expires_at <= ?", (now,))
+            conn.execute(
+                "INSERT OR REPLACE INTO batch_cache VALUES (?, ?, ?, ?)",
+                (cache_key, as_of, encoded, now + ttl_seconds),
+            )
+
+
+def get_cached_batch(key: str) -> dict | None:
+    cache_key = _cache_key(key)
+    table = _cache_table()
+    if table:
+        # Test the latest write for expiration so an older value cannot resurface.
+        rows = _cache_query(table,
+            f"""SELECT as_of, data_json FROM (
+                    SELECT as_of, data_json, expires_at FROM `{table}`
+                    WHERE cache_key = @key
+                      AND stored_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+                    ORDER BY stored_at DESC LIMIT 1
+                ) WHERE expires_at > CURRENT_TIMESTAMP()""",
+            [("key", "STRING", cache_key)])
+        row = next(iter(rows), None)
+    elif os.environ.get("LEDGER_BACKEND", "sqlite").lower() == "sqlite":
+        with _local_cache() as conn:
+            row = conn.execute(
+                "SELECT as_of, data_json FROM batch_cache WHERE cache_key=? AND expires_at>?",
+                (cache_key, time.time()),
+            ).fetchone()
+    else:
+        return None
+    return {"mode": "CACHED", "as_of": row[0], "data": json.loads(row[1])} if row else None
