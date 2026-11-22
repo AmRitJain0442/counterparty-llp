@@ -23,6 +23,8 @@ class ReceiptTests(unittest.TestCase):
                 receipts.verify_receipt(finding, receipt, require_rekor=True)
             with self.assertRaises(receipts.ReceiptError):
                 receipts.verify_receipt({**finding, "as_of": "2027-01-01"}, receipt)
+            with self.assertRaises(receipts.ReceiptError):
+                receipts.verify_receipt({**decorated, "receipt": "replaced"}, receipt)
             cosign.assert_not_called()
 
     def test_unconfigured_publication_fails_before_signing(self):
@@ -30,6 +32,27 @@ class ReceiptTests(unittest.TestCase):
             with self.assertRaises(receipts.ReceiptError):
                 receipts.create_receipt({"id": "test"}, publish=True)
             cosign.assert_not_called()
+
+    def test_signer_receives_only_commitment_and_incomplete_proof_fails(self):
+        finding = {"id": "private-id", "evidence": [{"detail": "confidential observation"}]}
+        receipt = receipts.create_receipt(finding)
+
+        def sign(*args):
+            self.assertEqual(args[0], "sign-blob")
+            self.assertEqual(Path(args[-1]).read_bytes(), bytes.fromhex(receipt["digest"]))
+            self.assertNotIn("private-id", str(args))
+            self.assertNotIn(receipt["nonce"], str(args))
+            Path(args[args.index("--bundle") + 1]).write_text("{}", encoding="utf-8")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "test-trust"
+            path.touch()
+            settings = dict(REKOR_ENABLED="1", REKOR_SIGNING_KEY="test-key", REKOR_PUBLIC_KEY=str(path),
+                            REKOR_TRUSTED_ROOT=str(path), REKOR_SIGNING_CONFIG="")
+            with patch.dict(os.environ, settings), patch.object(receipts, "_cosign", side_effect=sign) as signer:
+                with self.assertRaises(receipts.ReceiptError):
+                    receipts.publish_receipt(finding, receipt)
+                signer.assert_called_once()
 
     def test_compare_snapshot_when_attaching(self):
         case = {"id": "sample", "verdict": "SIGNED"}

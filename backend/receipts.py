@@ -37,6 +37,8 @@ def _check_commitment(finding, receipt):
     digest = _digest(finding, bytes.fromhex(receipt["nonce"]))
     if not hmac.compare_digest(digest, receipt["digest"]):
         raise ReceiptError("Finding does not match the receipt")
+    if "receipt_record" in finding and finding.get("receipt", digest) != digest:
+        raise ReceiptError("Displayed case digest does not match its receipt")
     return bytes.fromhex(digest)
 
 
@@ -157,7 +159,7 @@ def _main():
             print(receipt["status"])
         else:
             print(verify_receipt(case, case["receipt_record"], require_rekor=args.require_rekor))
-    except (ReceiptError, ValueError) as exc:
+    except ValueError as exc:
         parser.exit(1, f"{exc}\n")
 
 
