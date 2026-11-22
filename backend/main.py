@@ -64,6 +64,12 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/api/exhibits/older-estate")
+def historical_estate():
+    file = Path(__file__).parent / "exhibits" / "older-estate.json"
+    return json.loads(file.read_text(encoding="utf-8"))
+
+
 @app.get("/api/watch")
 def company_watch():
     return watch_history()

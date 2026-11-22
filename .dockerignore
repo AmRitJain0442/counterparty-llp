@@ -2,6 +2,7 @@
 !requirements.txt
 !backend
 !backend/**/*.py
+!backend/exhibits/*.json
 !web
 !web/**
 web/node_modules

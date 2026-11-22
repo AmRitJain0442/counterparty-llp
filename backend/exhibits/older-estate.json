@@ -1,0 +1,98 @@
+{
+  "subject": "ANIMASKIN AS",
+  "evidence": [
+    {
+      "source": "crustdata",
+      "label": "company_identify",
+      "detail": "1 candidate match(es). Leading record: Animaskin, animaskin.no. Match confidence 100%.",
+      "as_of": "2026-11-22T08:17:04.750080+00:00",
+      "mode": "CACHED",
+      "url": "https://api.crustdata.com/company/identify"
+    },
+    {
+      "source": "brreg",
+      "label": "brreg",
+      "detail": "ANIMASKIN AS (817990452). Bankruptcy registered on 2025-06-11.",
+      "as_of": "2026-11-22T08:16:56.777725+00:00",
+      "mode": "CACHED",
+      "url": "https://data.brreg.no/enhetsregisteret/api/enheter/817990452"
+    },
+    {
+      "source": "brreg_roles",
+      "label": "brreg_roles",
+      "detail": "Statutory roles record retrieved. Personal identifiers are excluded from the ledger.",
+      "as_of": "2026-11-22T08:16:57.583652+00:00",
+      "mode": "CACHED",
+      "url": "https://data.brreg.no/enhetsregisteret/api/enheter/817990452/roller"
+    },
+    {
+      "source": "crustdata",
+      "label": "company_enrich",
+      "detail": "Matched company profile retrieved. Workforce count unavailable or suppressed.",
+      "as_of": "2026-11-22T08:17:05.916758+00:00",
+      "mode": "CACHED",
+      "url": "https://api.crustdata.com/company/enrich"
+    },
+    {
+      "label": "Estate employee flows",
+      "source": "crustdata",
+      "url": "https://api.crustdata.com/person/search",
+      "as_of": "2026-11-22T08:17:19.029729+00:00",
+      "mode": "CACHED",
+      "detail": "Retrospective reconstruction of next-employer starts from 2025-06-11 through 2026-11-22. No destination met the date and group-size requirements. 64 profiles have no published destination. Reviewed 64 distinct estate profiles.",
+      "status": "ok"
+    }
+  ],
+  "steps": [
+    {
+      "name": "company_identify",
+      "status": "ok",
+      "detail": "Provider collection"
+    },
+    {
+      "name": "brreg",
+      "status": "ok",
+      "detail": "Provider collection"
+    },
+    {
+      "name": "brreg_roles",
+      "status": "ok",
+      "detail": "Provider collection"
+    },
+    {
+      "name": "company_enrich",
+      "status": "ok",
+      "detail": "Provider collection"
+    },
+    {
+      "name": "person_search",
+      "detail": "Estate search page 1",
+      "status": "ok",
+      "credits": 11.5
+    },
+    {
+      "name": "person_search",
+      "detail": "Estate search page 2",
+      "status": "ok",
+      "credits": 3.22
+    },
+    {
+      "name": "Estate employee flows",
+      "status": "ok",
+      "detail": "Retrospective reconstruction of next-employer starts from 2025-06-11 through 2026-11-22. No destination met the date and group-size requirements. 64 profiles have no published destination. Reviewed 64 distinct estate profiles."
+    }
+  ],
+  "credits": 16.92,
+  "flows": [
+    {
+      "from": "Animaskin AS",
+      "to": "Unknown or suppressed",
+      "count": 64
+    }
+  ],
+  "desk": "estate",
+  "mode": "CACHED",
+  "as_of": "2026-11-22T08:17:19.029729+00:00",
+  "verdict": "INSUFFICIENT WITNESSES",
+  "summary": "No destination reached the publishing threshold in this reconstruction."
+}

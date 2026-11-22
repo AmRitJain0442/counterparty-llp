@@ -110,5 +110,8 @@ def collect_live(desk, subject, consent=False, inputs=None):
             for charge in charges:
                 result["credits"] = (round(result["credits"] + float(charge), 4)
                                      if result["credits"] is not None and charge is not None else None)
+            if (estate.get("unknown") or 0) >= 5:
+                result["flows"] = [*result["flows"], {"from": company_name, "to": "Unknown or suppressed",
+                                                      "count": estate["unknown"]}]
             report("Estate employee flows", estate["status"], "Estate cohort review complete")
     return result
