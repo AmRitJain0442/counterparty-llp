@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { DESK_BY_ID } from '../desks'
 import { verifyReceipt } from '../api'
-import { evidenceBadge, formatCredits, formatDate, safeUrl, shortDigest, statusTone, verdictTone } from '../format'
+import { evidenceBadge, formatCredits, formatDate, isLive, modeLabel, safeUrl, shortDigest, statusTone, verdictTone } from '../format'
 import Sankey from './Sankey'
 import './case.css'
 
@@ -25,7 +25,7 @@ function Evidence({ rows }) {
               <summary>
                 <span className="e-label">{row.label}</span>
                 <span className="e-source">{row.source}</span>
-                <span className={'pill ' + (badge === 'LIVE' ? 'tone-clear' : badge === 'DEMO' || badge === 'CACHED' || badge === 'REPLAY' ? 'tone-sign' : 'tone-neutral')}>{badge}</span>
+                <span className={'pill ' + (badge === 'LIVE' ? 'tone-clear' : badge === 'STORED REPLAY' || badge === 'CACHED' || badge === 'REPLAY' ? 'tone-sign' : 'tone-neutral')}>{badge}</span>
               </summary>
               <div className="e-body">
                 <p>{row.detail}</p>
@@ -84,7 +84,7 @@ export default function CaseFile({ record, loading, error }) {
     return (
       <div className="case-file empty">
         <span className="label">Case file</span>
-        <p>Run a desk above or pick a row in the ledger. The verdict, steps, every piece of evidence and the receipt appear here.</p>
+        <p>Open a live case above or pick a filed row in the ledger. The verdict, steps, every piece of evidence and the receipt appear here.</p>
       </div>
     )
   }
@@ -105,9 +105,9 @@ export default function CaseFile({ record, loading, error }) {
           <h3 id="case-verdict" className={'verdict tone-' + tone}>{record.verdict}</h3>
         </div>
         <div className="case-meta">
-          <h4>{record.subject || 'Seeded demonstration case'}</h4>
+          <h4>{record.subject || 'Untitled case'}</h4>
           <div className="chips">
-            <span className={'pill ' + (record.mode === 'live' ? 'tone-clear' : 'tone-sign')}>{record.mode}</span>
+            <span className={'pill ' + (isLive(record) ? 'tone-clear' : 'tone-sign')}>{modeLabel(record.mode)}</span>
             <span className="chip">As of {formatDate(record.as_of, true)}</span>
             <span className="chip">{formatCredits(record.credits)}</span>
             {record.swarm_events?.length > 0 && <a className="chip" href={'/?case='+encodeURIComponent(record.id)+'#swarm'}>Inspect swarm trace ↗</a>}

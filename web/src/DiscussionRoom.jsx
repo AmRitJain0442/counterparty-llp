@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import HumanReview from './HumanReview'
+import { modeLabel } from './format'
 import './council.css'
 
 const roles = [
@@ -80,8 +81,8 @@ export default function DiscussionRoom({initialCase}) {
       {roles.map(([id,name],i)=><button key={id} aria-pressed={focus===i} onClick={()=>setFocus(i)}>{name}</button>)}
     </div>
     <section className="council-notes" aria-live="polite"><div><small style={{color:roles[focus][3]}}>{roles[focus][1]}</small>
-      <h2>{roles[focus][2]}</h2>{record && <p>{record.subject} · {record.mode.toUpperCase()}</p>}</div>
-      <div>{error || (!record ? 'Run a desk investigation to see its evidence here.' :
+      <h2>{roles[focus][2]}</h2>{record && <p>{record.subject} · {modeLabel(record.mode).toUpperCase()}</p>}</div>
+      <div>{error || (!record ? 'Open a live investigation to see its evidence here.' :
         evidence.length ? evidence.map((e,i) => <article key={i}><strong>{e.label}</strong><p>{e.detail}</p></article>) :
           'This case has no filed observation from this desk.')}</div>
     </section>

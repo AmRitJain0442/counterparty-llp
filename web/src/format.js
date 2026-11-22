@@ -36,9 +36,16 @@ export function safeUrl(url) {
 /** Evidence from replayed or cached data carries its own label so it is never read as live. */
 export function evidenceBadge(row) {
   const text = String(row.mode || '').toUpperCase()
-  if (['LIVE', 'DEMO', 'CACHED', 'REPLAY'].includes(text)) return text
+  if (text === 'DEMO') return 'STORED REPLAY'
   return text || 'UNLABELLED'
 }
+
+/** Cases filed before the desks went live-only are labelled as stored replays, never as live. */
+export function modeLabel(mode) {
+  return String(mode).toLowerCase() === 'live' ? 'Live' : 'Stored replay'
+}
+
+export const isLive = record => String(record?.mode).toLowerCase() === 'live'
 
 export function statusTone(status = '') {
   const s = String(status).toLowerCase()
