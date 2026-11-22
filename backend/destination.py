@@ -1,4 +1,5 @@
-﻿"""Screen the largest publishable workforce destination for ordinary explanations."""
+"""Screen the largest publishable workforce destination for ordinary explanations."""
+import re
 from datetime import date
 
 from .identity import resolve_public_ids
@@ -23,12 +24,26 @@ def _directors(data):
     return people
 
 
-def screen_destination(flows, origin, role_record, failed_on):
+def screen_destination(flows, origin, role_record, failed_on, charges):
     eligible = [f for f in flows if f.get("count", 0) >= 5 and f.get("to")
                 and f["to"].lower() not in ("unknown", "other", "unresolved")]
     if not eligible or not failed_on:
         return []
     destination = max(eligible, key=lambda f: f["count"])["to"]
+    alias = destination
+    if "." in alias or alias.startswith("Crustdata company "):
+        if re.fullmatch(r"Crustdata company [1-9][0-9]*", alias):
+            payload = {"crustdata_company_ids": [int(alias.split()[-1])]}
+        else:
+            payload = {"domains": [alias], "exact_match": True}
+        found = run_live("estate", "", False, {"crustdata": {"company_identify": payload}})
+        charges.extend(item.get("actual") for item in found["credits"])
+        rows = found["evidence"][0].get("data") or []
+        matches = rows[0].get("matches", []) if rows else []
+        exact = [m for m in matches if m.get("confidence_score", 0) >= .8]
+        if len(exact) != 1:
+            return []
+        destination = exact[0]["company_data"]["basic_info"]["name"]
     org = resolve_public_ids("estate", destination, {}).get("orgnr")
     if not org or org == origin:
         return []

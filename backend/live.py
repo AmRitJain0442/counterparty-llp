@@ -99,6 +99,10 @@ def collect_live(desk, subject, consent=False, inputs=None):
                 result["credits"] = (round(result["credits"] + estate["credits"], 4)
                                      if result["credits"] is not None and estate["credits"] is not None else None)
             roles = next((e.get("data") for e in raw["evidence"] if e["operation"] == "brreg_roles"), {})
-            result["evidence"].extend(screen_destination(estate["flows"], safe.get("orgnr"), roles, filed))
+            charges = []
+            result["evidence"].extend(screen_destination(estate["flows"], safe.get("orgnr"), roles, filed, charges))
+            for charge in charges:
+                result["credits"] = (round(result["credits"] + float(charge), 4)
+                                     if result["credits"] is not None and charge is not None else None)
             report("Estate employee flows", estate["status"], "Estate cohort review complete")
     return result
