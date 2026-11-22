@@ -171,7 +171,7 @@ export default function Inspector({
             </label>
           )}
 
-          {live && <p className="insp-note">Live runs spend about {spec.credits} credits. Demo runs spend none.</p>}
+          {live && <p className="insp-note">Estimated collection cost: {spec.credits} Crustdata credits. Analysis uses up to 29 Gemini reviews on Vertex AI.</p>}
           <button type="submit" className="insp-run" disabled={running || missing}>
             {running ? 'Collecting evidence…' : live ? `Open a live ${spec.name} case` : `Run the ${spec.name} demo`}
           </button>
@@ -195,6 +195,12 @@ export default function Inspector({
             <div className="insp-verdict">{record.verdict}</div>
             {record.summary && <p>{record.summary}</p>}
             {record.council_decision && <p>Council · {record.council_decision.disposition}{record.council_decision.referred_by.length ? ' · ' + record.council_decision.referred_by.join(', ') : ''}</p>}
+            {record.council_decision?.specialist_referrals?.length > 0 && <details className="insp-ev">
+              <summary>Specialist referrals ({record.council_decision.specialist_referrals.length})</summary>
+              {record.council_decision.specialist_referrals.map(id => <p key={id}>
+                <button className="insp-parent" onClick={()=>onSelect(id)}>{reports[id]?.name || id} ↗</button>
+              </p>)}
+            </details>}
             {record.draft && <p className="insp-draft">{record.draft}</p>}
             {Array.isArray(record.evidence) && record.evidence.length > 0 && (
               <div className="insp-ev">
