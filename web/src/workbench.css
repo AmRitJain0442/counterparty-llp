@@ -1,0 +1,16 @@
+.live-bench,.provider-room {padding:clamp(26px,5vw,70px) 5%;max-width:1160px;margin:auto;color:#eee6d5}
+.live-bench h1 {font-size:clamp(2.4rem,6vw,4.8rem);letter-spacing:-.055em;margin:.2em 0}
+.live-bench p,.provider-room p {color:#b9b09f;line-height:1.6}
+.live-bench small,.provider-room th {font:500 .7rem/1.5 monospace;letter-spacing:.08em;color:#c4bba9}
+.bench-grid {display:grid;grid-template-columns:minmax(230px,.85fr) 1.4fr;gap:clamp(16px,4vw,60px);margin-top:30px}
+.bench-grid fieldset {padding:0;border:0;display:grid;gap:13px}
+.bench-grid label {display:grid;gap:6px;font-size:.9rem}
+.bench-grid input,.bench-grid select {width:100%;box-sizing:border-box;background:#1d1b15;color:#eee6d5;border:1px solid #4a463b;border-radius:4px;padding:10px;font:inherit}
+.bench-grid .consent {display:flex;align-items:center;gap:8px}.bench-grid .consent input{width:auto}
+.bench-grid button {background:#ff8257;color:#201810;font-weight:650;padding:12px;border:0;border-radius:4px;cursor:pointer}
+.bench-trace {padding:20px;border:1px solid #3e392f;background:#191812;min-width:0}
+.trace-line {display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #36342a;padding:10px 0;font-family:monospace}
+.trace-line b {color:#b6cc97}.bench-grid details {padding:10px 0;border-bottom:1px solid #3e392f}.bench-grid summary{cursor:pointer}
+.provider-room section {margin:0 0 36px}.provider-room table {border-collapse:collapse;width:100%;font-size:.9rem}
+.provider-room td,.provider-room th {text-align:left;padding:9px 10px;border-bottom:1px solid #403d30}.provider-room section {overflow:auto}
+@media(max-width:680px){.bench-grid {grid-template-columns:1fr}}
