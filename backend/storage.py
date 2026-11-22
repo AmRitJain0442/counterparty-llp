@@ -80,6 +80,14 @@ class _SQLiteLedger:
             conn.execute("BEGIN IMMEDIATE")
             return change(_SQLiteDocuments(conn))
 
+    def create_once(self, collection, key, doc):
+        with _connection() as conn:
+            write = conn.execute(
+                """INSERT INTO ledger (collection, id, body) VALUES (?, ?, ?)
+                   ON CONFLICT (collection, id) DO NOTHING""", (collection, key, _json(doc)),
+            )
+            return doc if write.rowcount else _SQLiteDocuments(conn).get(collection, key)
+
     def scan(self, collection, *, pending_limit=None):
         with _connection() as conn:
             sql = "SELECT body FROM ledger WHERE collection=?"
@@ -115,6 +123,16 @@ class _FirestoreLedger(_FirestoreDocuments):
             return change(_FirestoreDocuments(self.client, transaction))
 
         return run(self.client.transaction())
+
+    def create_once(self, collection, key, doc):
+        from google.api_core.exceptions import AlreadyExists
+
+        ref = self.collection(collection).document(key)
+        try:
+            ref.create(doc)
+        except AlreadyExists:
+            return ref.get().to_dict()
+        return doc
 
     def scan(self, collection, *, pending_limit=None):
         query = self.collection(collection)
@@ -223,23 +241,14 @@ def stage_watch_event(watch_id, notification_id: str, delivered_at: str) -> dict
     watch = _watch_key(watch_id)
     event_id = _key(f"crustdata/v1/{watch}/{notification_id}")
 
-    def stage(tx):
-        event = tx.get("watch_events", event_id)
-        if event is not None:
-            return event
-        binding = tx.get("watch_bindings", watch)
-        if binding is None:
-            raise KeyError("unbound watch")
-        event = {
-            "event_id": event_id,
-            "case": binding["case"],
-            "as_of": delivered_at,
-            "state": "pending",
-        }
-        tx.put("watch_events", event_id, event)
-        return event
-
-    return _ledger().atomic(stage)
+    ledger = _ledger()
+    # Bindings are immutable. The uniqueness precondition on this single insert
+    # lets concurrent retries share an event without competing read/write locks.
+    binding = ledger.get("watch_bindings", watch)
+    if binding is None:
+        raise KeyError("unbound watch")
+    event = {"event_id": event_id, "case": binding["case"], "as_of": delivered_at, "state": "pending"}
+    return ledger.create_once("watch_events", event_id, event)
 
 
 def pending_watch_events(limit: int = 100) -> list[str]:
