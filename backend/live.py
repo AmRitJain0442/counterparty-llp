@@ -3,6 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextvars import copy_context
 from datetime import datetime, timezone
 import re
+from urllib.parse import urlsplit
 from .providers import run_live
 from .identity import resolve_public_ids
 from .observations import describe
@@ -88,7 +89,12 @@ def collect_live(desk, subject, consent=False, inputs=None):
         registry = next((e.get("data") for e in raw["evidence"] if e["operation"] == "brreg"), {}) or {}
         registry_name = str(registry.get("navn") or "").casefold().strip()
         company_name = (company.get("basic_info") or {}).get("name", "").casefold().strip()
-        if registry_name and registry_name == company_name and registry.get("konkurs") is True:
+        website = str(registry.get("hjemmeside") or "").lower()
+        registry_host = (urlsplit(website if "://" in website else "//" + website).hostname or "").removeprefix("www.")
+        basic = company.get("basic_info") or {}
+        alias_bound = (registry_host and registry_host == basic.get("primary_domain")
+                       and registry_name.removesuffix(" as") == company_name.removesuffix(" as"))
+        if registry_name and (registry_name == company_name or alias_bound) and registry.get("konkurs") is True:
             filed = registry.get("konkursdato")
             report("Estate employee flows", "running", "Examining dated employment histories in aggregate")
             estate = estate_evidence(subject, domain, company, filed, datetime.now(timezone.utc))
