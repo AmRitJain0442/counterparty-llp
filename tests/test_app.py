@@ -53,3 +53,12 @@ def test_parallel_creation_keeps_both_receipts(client):
         cases = list(workers.map(create, range(2)))
     assert len({case["id"] for case in cases}) == 2
     assert {case["id"] for case in client.get("/api/cases").json()} == {case["id"] for case in cases}
+
+def test_review_keeps_original_commitment_valid(client):
+    case = client.post("/api/cases", json={"desk": "payment", "mode": "demo"}).json()
+    url = "/api/cases/" + case["id"]
+    entry = {"disposition": "Callback requested", "note": "Reviewer requested a call using the number on file."}
+    response = client.post(url + "/reviews", json=entry)
+    assert response.status_code == 201
+    assert client.get(url + "/reviews").json() == [response.json()]
+    assert client.get(url + "/receipt").json()["digest"] == case["receipt"]

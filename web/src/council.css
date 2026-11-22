@@ -14,3 +14,8 @@
 .council-notes {display:grid;grid-template-columns:1fr 1.5fr;border-top:1px solid #443f35;gap:24px;padding-top:22px}
 .council-notes article {border-bottom:1px solid #39362c;padding:.65em 0}
 @media(max-width:650px){.council-notes{grid-template-columns:1fr}.council-title label{max-width:100%}}
+.human-review {border-top:1px solid #413c31;margin-top:32px;padding-top:20px}
+.human-review form {max-width:40rem;margin:18px 0;display:grid;gap:12px}
+.human-review label{display:grid;gap:6px}.human-review select,.human-review textarea{padding:10px;font:inherit;background:#211f18;color:#eee6d5;border:1px solid #524d41}
+.human-review textarea{min-height:78px}.human-review button{justify-self:start;padding:10px 16px;cursor:pointer;background:#e5d7b9;color:#221f18;border:0}
+.human-review button:disabled {opacity:.5}

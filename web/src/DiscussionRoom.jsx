@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import HumanReview from './HumanReview'
 import './council.css'
 
 const roles = [
@@ -72,5 +73,6 @@ export default function DiscussionRoom({initialCase}) {
         evidence.length ? evidence.map((e,i) => <article key={i}><strong>{e.label}</strong><p>{e.detail}</p></article>) :
           'This case has no filed observation from this desk.')}</div>
     </section>
+    {record && <HumanReview key={record.id} caseId={record.id}/>}
   </section>
 }
