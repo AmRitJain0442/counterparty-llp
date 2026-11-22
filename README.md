@@ -1,83 +1,66 @@
-# Counterparty LLP
+# ![Counterparty LLP · Built with Crustdata](docs/brand/counterparty.svg)
 
-An evidence room for checking a payment request, an employment claim, a bankrupt estate or a listed company. Each desk collects dated observations, tests an alternative explanation and files a reviewable decision.
+**Built for ContextCon 05, the Crustdata hackathon at BITS Pilani.** Counterparty LLP helps a reviewer answer questions like “Does the person requesting new bank details still work for our vendor?” It brings dated Crustdata observations and independent records into one case file, with source cards for the reviewer to inspect. [Hackathon details](https://contextcon-bitspilani.com/)
 
-The public deployment runs on Google Cloud Run in Mumbai. Anyone can open an investigation and read filed cases in its shared Firestore ledger. Demo runs use zero provider credits. Live investigations use the project's Crustdata account and Gemini on Vertex AI. [Open Counterparty](https://counterparty-939419364980.asia-south1.run.app)
+**[Open the workspace](https://counterparty-939419364980.asia-south1.run.app/)** · **[Replay a completed investigation](https://counterparty-939419364980.asia-south1.run.app/?case=c4b983b065f7413daaf908c9ab06f9a6#swarm)** · [Run locally](#run-locally)
 
-## Run locally
+The replay opens a real company investigation without spending provider credits. Select **Scope analyst** on the map to see what its two specialists checked and which evidence they cited.
 
-Use Python 3.12 and Node.js 22 or newer. From the repository root on Windows:
+[![The Company desk with the Scope analyst selected. The inspector lists its assignment, handoffs and two completed specialist reports.](docs/brand/swarm-inspector.png)](https://counterparty-939419364980.asia-south1.run.app/?case=c4b983b065f7413daaf908c9ab06f9a6#swarm)
+
+## ![Crustdata in practice](docs/brand/crustdata-in-practice.svg)
+
+A company investigation begins with **Crustdata Company Identify**. A unique, confident match lets the desk enrich the company and search its indexed job postings. For a candidate who consents, the desk can also retrieve employment history and check dates against an employer-specific colleague search. The case preserves source labels, observation dates and reported credit usage. [Crustdata API documentation](https://docs.crustdata.com/general/introduction)
+
+In the linked investigation, the Company desk looked up **Crustdata itself**. It filed six source cards and used **2.23 Crustdata credits**. Multiple cards traced back to the same provider, so the recorded finding was **Insufficient witnesses**. [Verify the filed receipt](https://counterparty-939419364980.asia-south1.run.app/api/cases/c4b983b065f7413daaf908c9ab06f9a6/receipt)
+
+## ![Investigation desks](docs/brand/investigation-desks.svg)
+
+| Desk | What a reviewer can check |
+| --- | --- |
+| **Payment** | Does a bank-change request match the vendor’s identity, domain and claimed affiliation? |
+| **Candidate** | Do a consenting candidate’s claimed dates and team size line up with employment records and dated headcount? |
+| **Estate** | After a Norwegian bankruptcy, where did groups of employees move, and did the proposed successor already exist? |
+| **Company** | Do changes in leadership, headcount or hiring align with dated filings? |
+
+## ![The review team](docs/brand/the-review-team.svg)
+
+Four swarms handle **identity, discovery, challenge and decision**. Each of the **12 leads** gives two specialists a different question and waits for both reports. For example, the Scope analyst’s *Quantity reconciler* checks the numbers, while its *Entity boundary checker* checks whether those numbers describe the same company or team.
+
+Select a node to inspect its persona, assignment and sources. **Trace** replays the handoffs. The discussion room groups the 24 specialist reports under their leads, and the case receipt lets a reviewer verify the filed record. [Open the discussion room](https://counterparty-939419364980.asia-south1.run.app/workspace.html#flow)
+
+<a name="run-locally"></a>
+
+## ![Run locally](docs/brand/run-locally.svg)
+
+Use **Python 3.12** and **Node.js 22**. Run these commands from the repository root.
+
+**Windows · PowerShell**
 
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements.txt
-Push-Location web
-npm.cmd ci
-npm.cmd run build
-Pop-Location
+npm.cmd --prefix web ci
+npm.cmd --prefix web run build
 .\scripts\start.ps1
 ```
 
-Open **http://127.0.0.1:8080**. On macOS or Linux use `python3.12 -m venv .venv`, install the requirements with `.venv/bin/pip`, build the web app as above, and run `.venv/bin/python -m uvicorn backend.main:app --port 8080`. The production bundle and API share one origin.
+**macOS or Linux**
 
-**Demo** runs a curated case locally with source labels and dates. **Live** uses the configured Crustdata account for collection and Gemini on Vertex AI for analysis. Each completed run creates a ledger entry. SQLite defaults to `.local/ledger.sqlite3`.
+```sh
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+npm --prefix web ci
+npm --prefix web run build
+.venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8080
+```
 
-## Swarm map
+Open [localhost:8080](http://127.0.0.1:8080) and choose **Run → Demo** for a curated investigation with no credentials or provider charges. **Live** uses a server-side Crustdata account and Gemini on Vertex AI. A fully executed live case runs 28 Gemini reviews. The date plausibility specialist uses calendar arithmetic. Candidate investigations require consent, and cases filed on the hosted app enter its shared ledger.
 
-The first screen combines a radial workflow and an inspector. Drag to pan, use the wheel or pinch to zoom, and click the zoom percentage to fit the map. Select a node to focus its handoffs or use **Find** to locate an agent. On reload the rings, sectors and connections draw in sequence. Reduced-motion mode opens directly on the settled map. The inspector opens beside the map on desktop and as a bottom sheet on phones. **Run** opens the current desk’s intake. **Trace** replays a filed investigation without calling providers.
+## ![Technical reference](docs/brand/technical-reference.svg)
 
-Each investigation has four swarms, 12 leads and 24 specialists. Every lead assigns two specialists different questions about the same case and receives both reports before filing its own. Select a lead or specialist on the map to inspect its persona, assignment, handoffs and filed findings. The discussion room groups specialist reports and source cards under the lead who commissioned them.
-
-In live mode, 23 specialists run separate Gemini reviews. The date plausibility checker compares source dates using calendar arithmetic. Five leads use Gemini to synthesize findings, and seven use deterministic checks for tasks such as indexing sources and preserving the evidence rules. A fully executed live investigation runs 28 model reviews on Vertex AI. Analysts pass their findings to the challengers, who pass theirs to the review partner. A specialist can flag missing evidence for human review even when a lead would otherwise accept the proposed finding. The additional opinions all refer back to the underlying source cards.
-
-Demo specialists run their checks locally. A new case receipt covers the team's personas and assignments, reports and execution order. Reopening an older case shows the team originally recorded for that case.
-
-## Credentials
-
-| Variable | Use |
-|---|---|
-| CRUSTDATA_API_KEY | Server-side Crustdata bearer token |
-| GOOGLE_CLOUD_PROJECT | Project billed for Gemini on Vertex AI |
-| GOOGLE_APPLICATION_CREDENTIALS | Optional path to a service account outside the checkout. ADC also supports workload identity. |
-| GOOGLE_CLOUD_LOCATION, VERTEX_MODEL | Defaults are global and gemini-2.5-flash. |
-| SEC_USER_AGENT | Organization name and contact email for SEC filing requests |
-| SQLITE_PATH | Optional local ledger path |
-
-The Windows launcher also reads the current user's DPAPI-protected Crustdata token and ADC path pointer under LocalAppData/CounterpartyLLP. The current workstation has both configured. Run `python -m scripts.preflight` with the Crustdata environment variable set to inspect endpoint availability and pricing. The cloud adapter configuration is documented under [cloud](cloud/) and [infrastructure decisions](docs/discussion/infrastructure.md).
-
-## Investigation interfaces
-
-| Route | Result |
-|---|---|
-| POST /api/cases | File a demo or live investigation |
-| POST /api/cases/stream | Same investigation with newline-delimited progress and a final case |
-| GET /api/swarms/{desk} | Twelve leads and their 24 specialists, including personas, assignments, ownership and dependencies |
-| GET /api/cases | Ledger in reverse creation order |
-| GET /api/cases/{id} | Stored evidence, decision, cost and receipt |
-| GET /api/capabilities | Current account balance, prices and entitlements |
-| GET /api/cases/{id}/receipt | Verify the stored decision commitment |
-| GET /api/health | Service health |
-| GET /docs | Interactive API schema |
-
-Everyone with application access shares its ledger. The demo supports a synthetic candidate. A real candidate check requires consent and identifiers appropriate to the inquiry.
-
-## External API inventory
-
-| Service | Purpose | Access and costs |
-|---|---|---|
-| [Crustdata](https://docs.crustdata.com/general/introduction) | Identity, profile enrichment, workforce searches | Supplied account. The meter uses the returned credit header. |
-| [Google Cloud](https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/quickstart-multimodal) | Gemini drafting, optional persistent cloud services | Supplied GCP project, usage billed by Google. |
-| [Brønnøysund Register Centre](https://data.brreg.no/enhetsregisteret/api/docs/index.html) | Norwegian entities, bankruptcy status and statutory roles | Free open-data endpoints |
-| [SEC EDGAR](https://www.sec.gov/search-filings/edgar-application-programming-interfaces) | Company submissions and dated 8-K items | Free public data API, identifying user agent required |
-| [RDAP registries](https://data.iana.org/rdap/dns.json) | Sender-domain registration dates for supported suffixes | Free public lookups subject to each registry's limits |
-| [Razorpay IFSC](https://github.com/razorpay/ifsc) | Indian branch and bank metadata | Free public lookup |
-| [GLEIF](https://www.gleif.org/en/lei-data/gleif-api) | Optional LEI lookup | Free public API |
-| [crt.sh](https://crt.sh/), [Wayback CDX](https://github.com/internetarchive/wayback/tree/master/wayback-cdx-server), [OpenIBAN](https://openiban.com/) | Optional internal domain-history and bank-code adapters | Free public endpoints, best effort |
-| [Sigstore Rekor](https://docs.sigstore.dev/logging/overview/) | Optional public commitment timestamp | Free public transparency service; private receipts are the default |
-
-## Further reading
-
-- [Live account rehearsal and observed limits](docs/rehearsal.md)
-- [Privacy and reviewer workflow](docs/privacy.md)
-- [Design discussion](docs/discussion/design.md)
-- [Original project brief](PROJECT.md)
+- [Configuration, API routes and external service costs](docs/technical-reference.md)
+- [Cloud deployment, ledger and receipts](cloud/README.md)
+- [Privacy and human review](docs/privacy.md)
+- [Product brief and hackathon track](PROJECT.md)
+- [Artwork sources and font license](docs/brand/SOURCES.md)
