@@ -59,3 +59,5 @@
 .fee dd { margin: 0; font-size: .92rem; }
 .fee div:last-child dd { color: var(--c); font-weight: 700; }
 @media (max-width: 560px) { .fee { grid-template-columns: 1fr; } }
+
+.live-feed {display:grid;gap:5px;padding:12px 0;font: .78rem var(--mono)} .live-feed div{display:flex;justify-content:space-between;gap:12px}.live-feed b{color:var(--clear)}

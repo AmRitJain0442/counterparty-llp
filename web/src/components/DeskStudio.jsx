@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { DESKS, DESK_BY_ID } from '../desks'
 import { createCase } from '../api'
+import { streamCase } from '../streamCase'
 import FlowDiagram from './FlowDiagram'
 import './studio.css'
 
@@ -18,6 +19,7 @@ export default function DeskStudio({ deskId, onDeskChange, onFiled }) {
   const [inputs, setInputs] = useState({})
   const [consents, setConsents] = useState({})
   const [busy, setBusy] = useState(false)
+  const [activity, setActivity] = useState({})
   const [error, setError] = useState('')
   const abort = useRef(null)
   useEffect(() => () => abort.current?.abort(), [])
@@ -45,13 +47,16 @@ export default function DeskStudio({ deskId, onDeskChange, onFiled }) {
     abort.current?.abort()
     abort.current = new AbortController()
     setBusy(true)
+    setActivity({})
     try {
       const cleaned = mode === 'live'
         ? Object.fromEntries(Object.entries(values).map(([k, v]) => [k, (v || '').trim()]).filter(([, v]) => v))
         : {}
-      const filed = await createCase({
+      const intake = {
         desk: deskId, mode, subject: subject.trim(), consent: needsConsent ? consent : false, inputs: cleaned,
-      }, abort.current.signal)
+      }
+      const filed = mode === 'demo' ? await createCase(intake, abort.current.signal)
+        : await streamCase(intake, event => setActivity(items => ({ ...items, [event.name]: event.status })), abort.current.signal)
       onFiled(filed)
     } catch (e) {
       if (e.name !== 'AbortError') setError(e.message)
@@ -120,7 +125,7 @@ export default function DeskStudio({ deskId, onDeskChange, onFiled }) {
             </button>
             <span className="fine">Findings are requests for explanation. A person makes the call.</span>
           </div>
-          {busy && <p className="status" role="status">Witnesses are being read. Live cases can take up to a minute.</p>}
+          {busy && <p className="status" role="status">Collecting the case evidence?</p>}
           {error && <p className="error" role="alert">{error}</p>}
         </form>
 
@@ -132,10 +137,13 @@ export default function DeskStudio({ deskId, onDeskChange, onFiled }) {
           <div className="flow-scroll" tabIndex={0} role="group" aria-label="Data flow diagram, scrolls sideways on small screens">
             <FlowDiagram desk={desk} values={values} mode={mode} />
           </div>
+          {busy && Object.keys(activity).length > 0 && <div className="live-feed" aria-label="Live collection events">
+            {Object.entries(activity).map(([name,status]) => <div key={name}><span>{name.replaceAll('_',' ')}</span><b>{status}</b></div>)}
+          </div>}
           <dl className="fee">
             <div><dt>Replaces</dt><dd>{desk.replaces}</dd></div>
             <div><dt>Human fee</dt><dd>{desk.fee}</dd></div>
-            <div><dt>This desk</dt><dd>{desk.credits} credits</dd></div>
+            <div><dt>{mode === 'demo' ? 'Demo cost' : 'Live budget estimate'}</dt><dd>{mode === 'demo' ? 0 : desk.credits} credits</dd></div>
           </dl>
         </div>
       </div>

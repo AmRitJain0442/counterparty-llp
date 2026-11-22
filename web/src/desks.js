@@ -47,7 +47,7 @@ export const DESKS = [
       { id: 'enrich', label: 'Crustdata person enrich', note: 'Dated roles at the employer', from: ['person_url'] },
       { id: 'search', label: 'Crustdata person search', note: 'Colleagues with overlapping dates', from: ['person_url', 'domain'] },
       { id: 'company', label: 'Crustdata company enrich', note: 'Headcount in the claimed quarter', from: ['domain'] },
-      { id: 'verify', label: 'Crustdata batch verify', note: 'Work-history check, with consent', from: ['person_url', 'claim'] },
+      { id: 'verify', label: 'Crustdata batch verify', note: 'Batch verification disabled on this account', from: ['person_url', 'claim'] },
     ],
   },
   {
@@ -68,7 +68,7 @@ export const DESKS = [
       { id: 'brreg', label: 'Brønnøysund enheter', note: 'Bankruptcy flag and date', from: ['orgnr'] },
       { id: 'roller', label: 'Brønnøysund roller', note: 'Statutory officers', from: ['orgnr'] },
       { id: 'people', label: 'Crustdata person search', note: 'Where former staff went', from: ['domain'] },
-      { id: 'wayback', label: 'Wayback CDX', note: 'Life signs after filing', from: ['domain'] },
+      { id: 'wayback', label: 'Destination review', note: 'Check registry dates and board overlap', from: ['domain'] },
     ],
   },
   {
