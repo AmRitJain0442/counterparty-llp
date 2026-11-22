@@ -111,12 +111,11 @@ export default function App() {
             <div className="hero-grid">
               <div>
                 <span className="label hot">Trust and compliance · four desks · one ledger</span>
-                <h1>Test every claim about a counterparty against <em>who actually works there.</em></h1>
+                <h1>Who?s on the <em>other side?</em></h1>
               </div>
               <div className="hero-side">
                 <p className="hero-lede">
-                  Is the party on the other side who they say they are, and are they still there? Counterparty checks dated
-                  employment records against independent public witnesses, then files one verdict you can hold in your hand.
+                  Trace a counterparty claim through employment records, registries and filings. Follow each desk to the evidence behind its decision.
                 </p>
                 <div className="hero-actions">
                   <a className="btn primary" href="#desks">Run a desk</a>
@@ -128,7 +127,7 @@ export default function App() {
             <div className="hero-facts">
               <div><b>4</b><span>desks, each ending in one verdict</span></div>
               <div><b>2</b><span>witnesses before anything adverse is signed</span></div>
-              <div><b>~60 cr</b><span>to run all four demos end to end</span></div>
+              <div><b>0 cr</b><span>to run all four synthetic cases</span></div>
               <div><b>0</b><span>automated legal effects. A person calls back</span></div>
             </div>
           </div>
@@ -213,7 +212,7 @@ export default function App() {
       <footer className="foot">
         <div className="wrap">
           <Logo />
-          <p>Findings are requests for explanation, not accusations. Workers appear as aggregates. Counterparty acts on a documented legitimate-interest basis and leaves the decision to a person.</p>
+          <p>Findings are requests for explanation, not accusations. Workers appear as aggregates. A reviewer records any callback or correction.</p>
         </div>
       </footer>
     </>
