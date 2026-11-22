@@ -8,6 +8,7 @@ from .providers import run_live
 from .identity import resolve_public_ids
 from .observations import describe
 from .colleagues import overlap_count
+from .findings import interpret
 from .estate import estate_evidence
 from .destination import screen_destination
 from .progress import report
@@ -83,6 +84,11 @@ def collect_live(desk, subject, consent=False, inputs=None):
     result = dict(evidence=evidence, steps=[dict(name=s['operation'], status=s['status'], detail='Provider collection') for s in raw['steps']],
                   flows=[], credits=sum(float(c) for c in credits) if credits and all(c is not None for c in credits) else None,
                   signals=raw['signals'])
+    interpreted = interpret(desk, subject, {**safe, "consent": consent}, raw)
+    result["evidence"].extend(interpreted["evidence"])
+    result["steps"].extend(step for step in interpreted["steps"] if step not in result["steps"])
+    result["signals"].extend(interpreted["signals"])
+    result.update(mode="live", subject=subject, consent=consent)
     if person and consent is not True:
         result['signals'].append(dict(type='consent_required', provider='crustdata', operation='person_enrich', status='skipped'))
     if desk == "estate" and len(matches) == 1:
