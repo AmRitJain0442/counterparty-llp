@@ -85,7 +85,7 @@ export default function SwarmMap({agents,selected,onSelect,events,running,previe
     }
   }
   return <div className={'swarm-map'+(playing?' moving':'')+(entering?' atlas-entering':'')+(camera.navigating?' navigating':'')} data-testid="swarm-map">
-    <svg ref={svgRef} {...camera.pointerProps} onKeyDown={mapKey} tabIndex="0" className="swarm-diagram" viewBox={compact?"100 0 700 735":"0 0 900 735"}
+    <svg ref={svgRef} {...camera.pointerProps} onKeyDown={mapKey} focusable="false" className="swarm-diagram" viewBox={compact?"100 0 700 735":"0 0 900 735"}
       aria-label="Investigation swarms and agent handoffs" role="group" aria-describedby="map-control-hint">
       <g className="map-geometry" style={{transform:camera.transform}}>
       <g className="outer-orbits" fill="none"><circle cx="450" cy="365" r="284"/><circle cx="450" cy="365" r="184"/><circle cx="450" cy="365" r="111"/></g>

@@ -139,10 +139,19 @@ def check_view(browser, url, *, mobile=False, reduced=False):
     assert moved == (not reduced), f"Unexpected map motion (reduced={reduced}, mobile={mobile})"
 
     node = diagram.get_by_role("button", name="Identity resolver agent", exact=True)
+    if reduced and not mobile:
+        view.get_by_role("button", name="Inspector", exact=True).focus()
+        page.keyboard.press("Tab")
+        expect(node).to_be_focused()
+        assert node.locator("path").first.evaluate("p => getComputedStyle(p).strokeDasharray !== 'none'")
+        page.keyboard.press("Enter")
     if mobile:
         node.tap()
     else:
         node.click()
+    expect(diagram).not_to_be_focused()
+    expect(diagram).to_have_css("outline-style", "none")
+    expect(node).to_have_css("outline-style", "none")
     expect(inspector.get_by_role("heading", name="Assignment")).to_be_visible()
     expect(inspector.get_by_role("button", name=re.compile("^Identity resolver"), pressed=True)).to_be_visible()
     if mobile:
