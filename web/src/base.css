@@ -1,4 +1,4 @@
-@font-face {font-family:Recursive;src:url(/fonts/recursive.woff2) format("woff2");font-weight:300 1000;font-style:oblique -15deg 0deg;font-display:swap;}
+@font-face {font-family:Recursive;src:url(/fonts/recursive.woff2) format("woff2");font-weight:300 1000;font-style:oblique 0deg 15deg;font-display:swap;}
 /* Layout: a warm-dark evidence room. One accent (hot), four desk colours that only ever mean a desk. */
 :root {
   --bg: #13120e;

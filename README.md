@@ -9,8 +9,10 @@ Use Python 3.12 and Node.js 22 or newer. From the repository root on Windows:
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements.txt
-npm --prefix web ci
-npm --prefix web run build
+Push-Location web
+npm.cmd ci
+npm.cmd run build
+Pop-Location
 .\scripts\start.ps1
 ```
 
