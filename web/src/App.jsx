@@ -111,7 +111,7 @@ export default function App() {
             <div className="hero-grid">
               <div>
                 <span className="label hot">Trust and compliance · four desks · one ledger</span>
-                <h1>Who?s on the <em>other side?</em></h1>
+                <h1>Who’s on the <em>other side?</em></h1>
               </div>
               <div className="hero-side">
                 <p className="hero-lede">

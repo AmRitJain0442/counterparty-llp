@@ -1,5 +1,4 @@
-﻿"""Curated synthetic cases for the four-desk stage rehearsal."""
-from datetime import date, timedelta
+"""Curated synthetic cases for the four-desk stage rehearsal."""
 
 DAY = "2026-11-22"
 CASES = {
