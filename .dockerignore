@@ -1,0 +1,9 @@
+**
+!requirements.txt
+!backend
+!backend/**/*.py
+!web
+!web/**
+web/node_modules
+web/dist
+web/.env*
