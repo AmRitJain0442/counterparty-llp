@@ -5,6 +5,7 @@ import re
 from .providers import run_live
 from .identity import resolve_public_ids
 from .observations import describe
+from .colleagues import overlap_count
 
 
 def collect_live(desk, subject, consent=False, inputs=None):
@@ -20,7 +21,8 @@ def collect_live(desk, subject, consent=False, inputs=None):
     domain = safe.get('domain', '').lower()
     if domain:
         safe['domain'] = domain
-    calls['company_identify'] = {'domains': [domain], 'exact_match': True} if domain else {'names': [str(subject)[:200]]}
+    if desk != 'candidate' or domain:
+        calls['company_identify'] = {'domains': [domain], 'exact_match': True} if domain else {'names': [str(subject)[:200]]}
     # The identity, person, and public registry desks can collect independently.
     lanes = [{"crustdata": {operation: payload}} for operation, payload in calls.items()]
     lanes.extend({field: safe[field]} for field in ("orgnr", "cik", "ifsc", "lei") if safe.get(field))
@@ -38,6 +40,7 @@ def collect_live(desk, subject, consent=False, inputs=None):
     identified = next((e['data'] for e in raw['evidence'] if e['operation'] == 'company_identify'), None)
     matches = identified[0].get('matches', []) if isinstance(identified, list) and len(identified) == 1 else []
     matches = [m for m in matches if isinstance(m, dict) and isinstance(m.get('confidence_score'), (int, float)) and m['confidence_score'] >= .8]
+    overlap_note = None
     if len(matches) == 1:
         company = matches[0].get('company_data', {})
         cid = company.get('crustdata_company_id') or company.get('basic_info', {}).get('crustdata_company_id')
@@ -45,11 +48,32 @@ def collect_live(desk, subject, consent=False, inputs=None):
             extra = run_live(desk, '', consent, {'crustdata': {'company_enrich': {'crustdata_company_ids': [cid], 'fields': ['basic_info', 'headcount', 'people']}}})
             for key in ('evidence', 'steps', 'credits', 'signals'):
                 raw[key].extend(extra[key])
+            person_rows = next((e["data"] for e in raw["evidence"] if e["operation"] == "person_enrich"), [])
+            if desk == "candidate" and consent and isinstance(person_rows, list) and person_rows:
+                matched = person_rows[0].get("matches", [])
+                target = matched[0].get("person_data", {}) if len(matched) == 1 else person_rows[0].get("person_data", {})
+                company_name = (company.get("basic_info") or {}).get("name")
+                if target and company_name:
+                    payload = {"filters": {"field": "experience.employment_details.company_name",
+                                           "type": "in", "value": [company_name]}, "limit": 25,
+                               "fields": ["crustdata_person_id", "experience.employment_details"]}
+                    peers = run_live(desk, "", consent, {"crustdata": {"person_search": payload}})
+                    for key in ("evidence", "steps", "credits", "signals"):
+                        raw[key].extend(peers[key])
+                    row = peers["evidence"][0]
+                    count = overlap_count(target, row.get("data") or {}, cid)
+                    detail = (f"{count} distinct colleagues have a dated overlap in this sample."
+                              if count is not None and count >= 5 else
+                              "Insufficient dated overlap to publish an aggregate.")
+                    overlap_note = dict(source="Crustdata", label="Colleague overlap", detail=detail,
+                                        as_of=row["as_of"], mode="LIVE", url=row["source"])
     evidence = []
     for e in raw['evidence']:
         detail = describe(e)
         evidence.append(dict(source=e['provider'], label=e['operation'], detail=detail,
                              as_of=e['as_of'], mode='LIVE', url=e['source']))
+    if overlap_note:
+        evidence.append(overlap_note)
     credits = [c.get('actual') for c in raw['credits']]
     result = dict(evidence=evidence, steps=[dict(name=s['operation'], status=s['status'], detail='Provider collection') for s in raw['steps']],
                   flows=[], credits=sum(float(c) for c in credits) if credits and all(c is not None for c in credits) else None,
