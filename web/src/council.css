@@ -1,0 +1,16 @@
+.discussion-room { max-width:1100px;margin:0 auto;padding:clamp(26px,5vw,76px) 5%;color:#eee7d5;background:#161510 }
+.discussion-room h1,.discussion-room h2 {letter-spacing:-.055em;line-height:1.05;margin:.35em 0}
+.discussion-room h1 {font-size:clamp(2.5rem,6vw,5.2rem)}
+.discussion-room h2 {font-size:clamp(1.8rem,3vw,2.7rem)}
+.discussion-room small,.council-title label {font:600 .72rem/1.5 monospace;letter-spacing:.07em;color:#b9b09c}
+.discussion-room p {color:#beb7a6;line-height:1.5;max-width:64ch}
+.council-title {display:flex;align-items:end;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.council-title select {display:block;max-width:100%;margin-top:6px;border:1px solid #4c483b;background:#1e1d17;color:#eee7d5;padding:9px}
+.council-panel {border:1px solid #403c32;margin:28px 0;background:#191813;overflow-x:auto}
+.council-panel svg {display:block;width:100%;min-width:540px}
+.council-panel text {font:500 13px monospace}
+.council-panel g[role=button] {cursor:pointer}
+.council-panel g[role=button]:focus-visible circle {stroke:white}
+.council-notes {display:grid;grid-template-columns:1fr 1.5fr;border-top:1px solid #443f35;gap:24px;padding-top:22px}
+.council-notes article {border-bottom:1px solid #39362c;padding:.65em 0}
+@media(max-width:650px){.council-notes{grid-template-columns:1fr}.council-title label{max-width:100%}}
