@@ -84,7 +84,7 @@ def collect_live(desk, subject, consent=False, inputs=None):
     for e in raw['evidence']:
         detail = describe(e)
         evidence.append(dict(source=e['provider'], label=e['operation'], detail=detail,
-                             as_of=e['as_of'], mode='LIVE', url=e['source']))
+                             as_of=e['as_of'], mode='LIVE', url=e['source'], status=e.get('status', 'unknown')))
     if overlap_note:
         evidence.append(overlap_note)
     credits = [c.get('actual') for c in raw['credits']]

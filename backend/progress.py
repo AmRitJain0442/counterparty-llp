@@ -10,6 +10,12 @@ def report(name, status, detail):
         sink({"type": "step", "name": name, "status": status, "detail": detail})
 
 
+def send(event):
+    sink = _sink.get()
+    if sink:
+        sink(event)
+
+
 def attach(sink):
     return _sink.set(sink)
 

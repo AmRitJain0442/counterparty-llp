@@ -22,7 +22,7 @@ def adjudicate(desk, raw):
         sources = {c.get("source") for c in raw.get("evidence", []) if
                    c.get("id") in cited and c.get("claim") == claim
                    and c.get("label") == "Vendor domain cross-check" and c.get("mode") == "LIVE"}
-        if sources >= {"Crustdata", "Br¯nn¯ysund"}:
+        if sources >= {"Crustdata", "Br√∏nn√∏ysund"}:
             return {"verdict": "HELD", "summary": claim + " Confirm the request by calling the number on file."}
     if desk == "company" and raw.get("forecast"):
         return {"verdict": "FORECAST FOR REVIEW", "summary": raw["forecast"]["prediction"]}

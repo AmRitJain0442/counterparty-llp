@@ -29,6 +29,9 @@ def draft_note(desk, evidence, verdict, role="analyst"):
         policy += (" Act as opposing counsel. Identify one plausible alternative explanation or "
                    "identity, timing or sample-size limitation anchored to a specific named source. "
                    "Give the reviewer a way to distinguish it. If a source was unavailable, say so.")
+    elif role == "partner":
+        policy += (" Act as the review partner. Reconcile both challengers' findings. "
+                   "State what they agree on, any material disagreement and the next review action.")
     else:
         policy += " Act as an evidence analyst. Identify the most material dated observation and name its source."
     try:

@@ -2,7 +2,6 @@
 import os
 import asyncio
 import json
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -16,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from .account import capabilities
 from .adjudication import adjudicate
 from .demo import build_demo
-from .drafting import draft_note
+from .swarm import agents_for, run_council
 from .receipts import ReceiptError, create_receipt, verify_receipt
 from .watch import router as watch_router
 from .watch_history import watch_history
@@ -80,6 +79,11 @@ def company_watch():
 @app.get("/api/capabilities")
 def provider_capabilities():
     return capabilities()
+
+
+@app.get("/api/swarms/{desk}")
+def roster(desk: Literal["payment", "candidate", "estate", "company"]):
+    return {"desk": desk, "agents": agents_for(desk)}
 
 
 @app.get("/api/cases")
@@ -155,24 +159,28 @@ def investigate(intake: Intake):
         "flows": raw["flows"],
         "credits": raw["credits"],
     }
+    for index, row in enumerate(case["evidence"], start=1):
+        row.setdefault("id", f"source-card-{index}")
+    trace = []
+
+    def observe(item):
+        event = {"type": "step", "at": datetime.now(timezone.utc).isoformat(), **item}
+        trace.append(event)
+        progress.send(event)
+
+    reports = run_council(intake.desk, case["evidence"], ruling["verdict"], observe, intake.mode)
+    case["swarm_events"] = trace
+    case["swarm_reports"] = reports
+    case["steps"].extend({k: report[k] for k in ("name", "status", "detail")} for report in reports)
+    by_id = {r["agent_id"]: r for r in reports}
     if intake.mode == "live":
-        agents = {"analyst": "Gemini evidence analyst", "counsel": "Gemini opposing counsel"}
-        reviews = {}
-        with ThreadPoolExecutor(max_workers=2) as workers:
-            futures = {}
-            for role, name in agents.items():
-                progress.report(name, "running", "Reviewing minimized evidence on Vertex AI")
-                futures[workers.submit(draft_note, intake.desk, case["evidence"], case["verdict"], role)] = role
-            for future in as_completed(futures):
-                role = futures[future]
-                note, status = future.result()
-                progress.report(agents[role], status, "Reviewer handoff complete" if note else "Draft unavailable")
-                reviews[role] = {"name": agents[role], "status": status,
-                                 "detail": note or "Vertex AI draft unavailable for this case."}
-                if note and role == "analyst":
-                    case["draft"] = note
-        case["reviews"] = reviews
-        case["steps"].extend(reviews[role] for role in agents)
+        case["reviews"] = {"analyst": by_id["analyst_scope"], "counsel": by_id["challenger_scope"]}
+        partner = by_id["partner"]
+        if partner["status"] == "complete":
+            case["draft"] = partner["detail"]
+        elif ruling["verdict"] in {"HELD", "FORECAST FOR REVIEW", "REQUEST FOR EXPLANATION", "FAILED"}:
+            case["verdict"] = "PARTNER REVIEW"
+            case["summary"] = "The council could not complete its challenge and synthesis. A reviewer must assess the proposed finding."
     progress.report("Ledger", "running", "Committing the evidence receipt")
     if raw.get("forecast"):
         case["forecast"] = raw["forecast"]

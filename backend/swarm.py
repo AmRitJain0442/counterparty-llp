@@ -22,8 +22,20 @@ _SPECS = (
 )
 
 
+_STAGES = [ [('identity', []), ('sources', []), ('dates', []), ('material', []), ('gaps', [])],
+               [('analyst_scope', ['identity', 'sources', 'material']),
+                ('analyst_timing', ['dates', 'sources', 'material'])],
+               [('challenger_scope', ['analyst_scope', 'analyst_timing']),
+                ('challenger_timing', ['analyst_scope', 'analyst_timing'])],
+               [('partner', ['challenger_scope', 'challenger_timing']),
+                ('authority', ['material'])],
+               [('handoff', ['partner', 'authority', 'gaps'])] ]
+_DEPENDENCIES = {key: deps for stage in _STAGES for key, deps in stage}
+
+
 def agents_for(desk):
-    return [dict(id=key, name=name, group=group, task=f'{desk}: {task}', lane=lane)
+    return [dict(id=key, name=name, group=group, task=f'{desk}: {task}', lane=lane,
+                 depends_on=list(_DEPENDENCIES[key]))
             for key, name, group, task, lane in _SPECS]
 
 
@@ -37,18 +49,10 @@ def run_council(desk, evidence, verdict, emit, mode):
         raise ValueError('mode must be demo, replay, or live')
     replay = mode != 'live'
     rows = [dict(row) for row in evidence if row.get('id')]
-    material = [r for r in rows if r.get('status', 'ok') not in
-                ('unavailable', 'error', 'failed') and (r.get('detail') or r.get('label'))]
+    material = [r for r in rows if r.get('status', 'ok') in ('ok', 'complete') and (r.get('detail') or r.get('label'))]
     reports = {}
     agents = {a['id']: a for a in agents_for(desk)}
-    stages = [ [('identity', []), ('sources', []), ('dates', []), ('material', []), ('gaps', [])],
-               [('analyst_scope', ['identity', 'sources', 'material']),
-                ('analyst_timing', ['dates', 'sources', 'material'])],
-               [('challenger_scope', ['analyst_scope', 'analyst_timing']),
-                ('challenger_timing', ['analyst_scope', 'analyst_timing'])],
-               [('partner', ['challenger_scope', 'challenger_timing']),
-                ('authority', ['material'])],
-               [('handoff', ['partner', 'authority', 'gaps'])] ]
+
 
     def work(key, deps):
         agent = agents[key]
@@ -71,11 +75,11 @@ def run_council(desk, evidence, verdict, emit, mode):
                 context = [dict(id=r['id'], label=r.get('label', ''),
                                 detail=r.get('detail', ''), as_of=r.get('as_of', ''),
                                 source=r.get('source', '')) for r in selected]
-                context += [dict(label=f'Dependency {r["agent_id"]}', detail=r['detail'],
+                dependencies = [dict(label=f'Dependency {r["agent_id"]}', detail=r['detail'],
                                  source=', '.join(r['refs'])) for r in upstream]
-                context.insert(0, dict(label='Bounded assignment', detail=agent['task'], source='Council'))
+                context = [dict(label='Bounded assignment', detail=agent['task'], source='Council'), *dependencies, *context]
                 detail, status = draft_note(desk, context, verdict,
-                                           'counsel' if key.startswith('challenger') else 'analyst')
+                                           'partner' if key == 'partner' else 'counsel' if key.startswith('challenger') else 'analyst')
                 if not detail:
                     detail = f'Vertex note unavailable: {status}'
                     status = 'unavailable'
@@ -90,10 +94,11 @@ def run_council(desk, evidence, verdict, emit, mode):
                     detail=detail, refs=refs, depends_on=list(deps))
 
     with ThreadPoolExecutor(max_workers=5) as pool:
-        for stage in stages:
+        for stage in _STAGES:
             pending = []
             for key, deps in stage:
-                emit(dict(event='start', agent_id=key, status='running', depends_on=deps,
+                emit(dict(event='start', agent_id=key, name=agents[key]['name'], group=agents[key]['group'],
+                          detail=agents[key]['task'], status='running', depends_on=deps,
                           mode='replay' if replay else 'live', replay=replay))
                 pending.append((key, pool.submit(work, key, deps)))
             for key, future in pending:
