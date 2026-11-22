@@ -1,4 +1,4 @@
-"""Check /#swarm on a running app. Files one Payment demo after the read-only checks.
+"""Check /#swarm on a running app. Uses read-only API requests and an intercepted live submission.
 
     python scripts/swarm_smoke.py [BASE_URL] --channel chrome
 """
@@ -9,54 +9,63 @@ import re
 from playwright.sync_api import expect, sync_playwright
 
 
-def run_demo(page, inspector, agent_ids):
+def check_live_intake(page, view, inspector, roster):
     inspector.get_by_role("button", name="Run", exact=True).click()
-    expect(inspector.get_by_role("radio", name="Demo")).to_be_checked()
+    expect(inspector.get_by_role("radio")).to_have_count(0)
+    subject = inspector.get_by_label("Subject", exact=True)
+    submit = inspector.get_by_role("button", name="Open a live Payment case")
+    expect(submit).to_be_disabled()
+    subject.fill("  ")
+    expect(submit).to_be_disabled()
+    subject.fill("Smoke test")
+    expect(submit).to_be_enabled()
+    inspector.get_by_label("Contact profile URL", exact=False).fill("https://example.org/contact")
+    expect(submit).to_be_disabled()
+    inspector.get_by_role("checkbox").check()
+    expect(submit).to_be_enabled()
 
-    # All other API writes stay blocked, including a duplicate submission.
-    def allow_demo(route):
-        req = route.request
-        if req.method == "POST" and (req.post_data_json or {}).get("mode") == "demo":
-            route.continue_()
-        else:
-            route.abort()
+    inspector.get_by_role("tab", name="Candidate").click()
+    submit = inspector.get_by_role("button", name="Open a live Candidate case")
+    expect(subject).to_have_value("")
+    subject.fill("Smoke test")
+    inspector.get_by_role("checkbox").check()
+    for label, value in [("Candidate profile URL", "https://example.org/contact"),
+                         ("Claimed employer domain", "example.org"), ("Claim from the CV", "Engineer")]:
+        expect(submit).to_be_disabled()
+        inspector.get_by_label(label).fill(value)
+    expect(submit).to_be_enabled()
+    inspector.get_by_role("checkbox").uncheck()
+    expect(submit).to_be_disabled()
 
-    page.route("**/api/cases/stream", allow_demo, times=1)
-    with page.expect_request_finished(lambda r: r.url.endswith("/api/cases/stream"), timeout=8000) as filed:
-        inspector.get_by_role("button", name="Run the Payment demo", exact=True).click()
-    response = filed.value.response()
-    assert response.ok, f"Demo returned HTTP {response.status}"
-    messages = [json.loads(line) for line in response.text().splitlines() if line.strip()]
-    assert messages[-1]["type"] == "case", "Demo stream did not end with a filed case"
-    case = messages[-1]["case"]
-    events = [m for m in messages if m.get("agent_id")]
-    assert case["mode"] == "demo" and events == case["swarm_events"], "Filed trace differs from demo stream"
-    assert len(case["swarm_roster"]) == len(case["swarm_reports"]) == len(agent_ids) == 36
-    children = [a for a in case["swarm_roster"] if a["parent_id"]]
-    assert len(children) == 24 and len({a["persona"] for a in case["swarm_roster"]}) == 36
-    phases = {}
-    expected = [("start", "running"), ("end", "complete")]
-    for event in events:
-        agent = event["agent_id"]
-        for dep in event["depends_on"]:
-            assert phases.get(dep) == expected, f"{agent} ran before {dep} finished"
-        if event["parent_id"]:
-            assert phases.get(event["parent_id"]) == expected[:1], f"{agent} ran outside its lead's assignment"
-        elif event["event"] == "end":
-            assert len(event["specialist_ids"]) == 2 and all(phases.get(child) == expected for child in event["specialist_ids"])
-        phases.setdefault(agent, []).append((event["event"], event["status"]))
-    assert phases.keys() == agent_ids, "Streamed agents differ from map nodes"
-    for agent, sequence in phases.items():
-        assert sequence == expected, f"{agent} emitted {sequence}"
+    inspector.get_by_role("tab", name="Payment").click()
+    subject.fill("  Smoke test  ")
+    agent = next(a for a in roster if a["id"] == "identity")
+    events = [
+        {"type": "step", "agent_id": agent["id"], "name": agent["name"], "event": phase, "status": status}
+        for phase, status in [("start", "running"), ("end", "complete")]
+    ]
+    case = {"id": "browser-smoke", "mode": "live", "desk": "payment", "subject": "Smoke test",
+            "verdict": "HELD", "receipt": "0123456789abcdef", "swarm_roster": roster,
+            "swarm_events": events, "swarm_reports": [events[-1]]}
+    submissions = []
 
-    agent_count = len(agent_ids)
-    expect(inspector.get_by_text(case["receipt"][:16], exact=True)).to_be_visible()
-    expect(inspector.get_by_text(f"Synthetic investigation · {agent_count} of {agent_count} agent reports",
-                                 exact=True)).to_be_visible(timeout=20000)
-    # Recent activity presents the last handoff newest first.
-    activity = inspector.get_by_role("button", name=re.compile("^" + re.escape(events[-1]["name"])))
-    expect(activity.first).to_contain_text("Done")
-    return len(events)
+    def respond(route):
+        submissions.append((route.request.method, route.request.post_data_json))
+        messages = [*events, {"type": "case", "case": case}]
+        route.fulfill(content_type="application/x-ndjson", body="\n".join(json.dumps(m) for m in messages))
+
+    page.route("**/api/cases/stream", respond)
+    inspector.get_by_role("button", name="Open a live Payment case").click()
+    expect(inspector.get_by_text(case["receipt"], exact=True)).to_be_visible()
+    assert submissions == [("POST", {"desk": "payment", "mode": "live", "subject": "Smoke test",
+                                    "inputs": {}, "consent": False})]
+    expect(view.locator(".motion-control")).to_contain_text("Recorded trace")
+    summary = f"1 of {len(roster)} agent reports"
+    expect(inspector.get_by_text("Recorded trace · " + summary, exact=True)).to_be_visible()
+    inspector.get_by_role("button", name="Replay handoffs").click()
+    expect(inspector.get_by_text("Recorded playback", exact=False)).to_be_visible()
+    expect(inspector.get_by_text("Recorded trace · " + summary, exact=True)).to_be_visible()
+    expect(inspector.get_by_role("button", name=re.compile("^Identity resolver")).first).to_contain_text("Done")
 
 
 def test_camera(page, view, diagram, *, mobile, reduced):
@@ -116,7 +125,7 @@ def test_camera(page, view, diagram, *, mobile, reduced):
 
 def check_view(browser, url, *, mobile=False, reduced=False):
     page = browser.new_page(viewport={"width": 390 if mobile else 1440, "height": 844 if mobile else 900},
-                            is_mobile=mobile, has_touch=mobile, reduced_motion="reduce" if reduced else "no-preference")
+                            is_mobile=mobile, has_touch=mobile, service_workers="block", reduced_motion="reduce" if reduced else "no-preference")
     page.set_default_timeout(3500)
     page.route("**/api/**", lambda r: r.continue_() if r.request.method == "GET" else r.abort())
     page.add_init_script("""window.entranceStages=new Set();
@@ -138,6 +147,7 @@ def check_view(browser, url, *, mobile=False, reduced=False):
     test_camera(page, view, diagram, mobile=mobile, reduced=reduced)
     control = "Play" if reduced else "Pause"
     expect(view.get_by_role("button", name=f"{control} data flow animation")).to_be_visible()
+    expect(view.locator(".motion-control")).to_contain_text("Workflow map")
     frames = {diagram.screenshot()}
     for _ in range(3):
         page.wait_for_timeout(220)  # Sample the untouched map across browser paints.
@@ -162,6 +172,9 @@ def check_view(browser, url, *, mobile=False, reduced=False):
     expect(inspector.get_by_role("heading", name="Assignment")).to_be_visible()
     expect(inspector.get_by_role("button", name=re.compile("^Identity resolver"), pressed=True)).to_be_visible()
     roster = page.request.get(url.split("#")[0].rstrip("/") + "/api/swarms/payment").json()["agents"]
+    assert len(roster) == len({a["persona"] for a in roster}) == 36
+    assert sum(bool(a["parent_id"]) for a in roster) == 24
+    assert {n.get_attribute("data-agent-id") for n in nodes.all()} == {a["id"] for a in roster}
     specialist = next(a for a in roster if a["parent_id"] == "identity")
     specialist_node = diagram.locator('[data-agent-id="' + specialist["id"] + '"]')
     expect(specialist_node).to_have_count(1)
@@ -173,9 +186,7 @@ def check_view(browser, url, *, mobile=False, reduced=False):
         expect(inspector.get_by_role("button", name="Close inspector")).to_be_in_viewport()
         assert page.evaluate("innerWidth === 390 && document.documentElement.scrollWidth <= innerWidth"), "Mobile overflow"
     if not mobile and not reduced:
-        agent_ids = {node.get_attribute("data-agent-id") for node in nodes.all()}
-        events = run_demo(page, inspector, agent_ids)
-        print(f"Payment demo filed with {events} ordered agent events")
+        check_live_intake(page, view, inspector, roster)
     page.close()
 
 
