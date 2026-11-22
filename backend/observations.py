@@ -42,6 +42,12 @@ def describe(row):
         return ", ".join(str(data[k]) for k in ("BANK", "BRANCH", "CITY", "IFSC") if data.get(k))
     if op == "submissions":
         return f"Filing index retrieved for {data.get('name', 'issuer')}, CIK {data.get('cik', 'unknown')}."
+    if op == "job_search":
+        listings = data.get("job_listings") or []
+        latest = (listings[0].get("metadata") or {}).get("date_added") if listings else None
+        count = data.get("total_count")
+        return ((f"{count} indexed postings. " if isinstance(count, int) else "")
+                + (f"Latest index addition: {latest[:10]}." if isinstance(latest, str) else "Latest posting date unavailable."))
     if op == "gleif":
         entity = data.get("data", {}).get("attributes", {}).get("entity", {})
         return f"Registered legal name: {entity.get('legalName', {}).get('name', 'unavailable')}."

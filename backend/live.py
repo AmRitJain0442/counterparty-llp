@@ -22,6 +22,7 @@ def collect_live(desk, subject, consent=False, inputs=None):
     calls = {}
     person = safe.get('person_url', '')
     if person and consent is True and re.fullmatch(r'https://(?:www\.)?linkedin\.com/in/[A-Za-z0-9_%\-]+/?', person):
+        calls['person_identify'] = {'professional_network_profile_urls': [person]}
         calls['person_enrich'] = {'professional_network_profile_urls': [person],
                                   'fields': ['experience']}
     domain = safe.get('domain', '').lower()
@@ -51,7 +52,12 @@ def collect_live(desk, subject, consent=False, inputs=None):
         company = matches[0].get('company_data', {})
         cid = company.get('crustdata_company_id') or company.get('basic_info', {}).get('crustdata_company_id')
         if isinstance(cid, int):
-            extra = run_live(desk, '', consent, {'crustdata': {'company_enrich': {'crustdata_company_ids': [cid], 'fields': ['basic_info', 'headcount', 'people']}}})
+            operations = {"company_enrich": {"crustdata_company_ids": [cid], "fields": ["basic_info", "headcount", "people"]}}
+            if desk == "company":
+                operations["job_search"] = {"filters": {"field": "company.basic_info.company_id", "type": "=", "value": cid},
+                                            "fields": ["metadata.date_added"], "limit": 1,
+                                            "sorts": [{"field": "metadata.date_added", "order": "desc"}]}
+            extra = run_live(desk, "", consent, {"crustdata": operations})
             for key in ('evidence', 'steps', 'credits', 'signals'):
                 raw[key].extend(extra[key])
             person_rows = next((e["data"] for e in raw["evidence"] if e["operation"] == "person_enrich"), [])
