@@ -92,3 +92,7 @@
 @media(pointer:coarse){.atlas-dock .insp-acc li button {min-height:44px}}
 @media (max-width:520px){.insp{width:100vw}}
 @media (prefers-reduced-motion:no-preference){.insp{animation:insp-in .18s ease-out}@keyframes insp-in{from{transform:translateX(24px);opacity:0}}}
+
+.insp-hint{color:var(--dim,#928b77);font-size:11px;line-height:1.35}
+.insp-hint.warn{color:#ffb59c}
+.insp-f input[aria-invalid="true"]{border-color:#ff6a3d}

@@ -76,19 +76,26 @@ export const DESKS = [
     alias: 'Key-Person',
     color: '#c7a3d6',
     question: 'Is leadership or finance moving ahead of the filings?',
-    verdicts: ['FORECAST FOR REVIEW', 'INSUFFICIENT WITNESSES', 'PARTNER REVIEW'],
+    subject: {
+      label: 'Company name or domain',
+      placeholder: 'Skan AI or skan.ai',
+      error: 'Enter the company name or domain to investigate.',
+    },
+    verdicts: ['ROLE REPORTED', 'ROLE REVIEW', 'FORECAST FOR REVIEW', 'INSUFFICIENT WITNESSES', 'PARTNER REVIEW'],
     replaces: 'Kroll-style due-diligence report',
     fee: '$5–25k, 2 weeks',
     credits: '~15',
     fields: [
-      { key: 'domain', label: 'Company domain', placeholder: 'company.example' },
+      { key: 'domain', label: 'Company domain', placeholder: 'skan.ai' },
+      { key: 'executive_name', label: 'Executive name', placeholder: 'Manish Garg', hint: 'Checks the leadership roster supplied by Crustdata.' },
+      { key: 'executive_title', label: 'Claimed executive title', placeholder: 'CPTO' },
       { key: 'lei', label: 'Legal entity identifier', placeholder: '20-character LEI' },
       { key: 'cik', label: 'SEC CIK', placeholder: '10 digits' },
       { key: 'claim', label: 'Question to investigate', placeholder: 'Is the finance team turning over?', long: true },
     ],
     sources: [
       { id: 'edgar', label: 'SEC EDGAR submissions', note: 'Recent filings by form and date', from: ['cik'] },
-      { id: 'company', label: 'Crustdata company enrich', note: 'CXO tenure and finance moves', from: ['domain'] },
+      { id: 'company', label: 'Crustdata company enrich', note: 'Leadership titles and tenure', from: ['domain', 'executive_name', 'executive_title'] },
       { id: 'jobs', label: 'Crustdata job search', note: 'Most recent dated hiring signal', from: ['domain'] },
       { id: 'gleif', label: 'GLEIF', note: 'Legal entity and parents', from: ['lei'] },
     ],
@@ -96,6 +103,20 @@ export const DESKS = [
 ]
 
 export const DESK_BY_ID = Object.fromEntries(DESKS.map(d => [d.id, d]))
+
+/** Subject wording for a desk; only the Company desk narrows it to a company name or domain. */
+export const subjectSpec = desk => ({
+  label: 'Subject',
+  placeholder: 'The company or person being checked',
+  error: 'Enter who or what this live inquiry is about.',
+  ...desk?.subject,
+})
+
+/** A role without a name cannot be looked up. Returns feedback text, or '' when the intake is fine. */
+export const executiveProblem = (inputs = {}) =>
+  (inputs.executive_title || '').trim() && !(inputs.executive_name || '').trim()
+    ? 'Add the executive’s name, or clear the title. A role is only checked against a named person.'
+    : ''
 
 /** The shared adjudication route every desk passes through. */
 export const REVIEW_STAGES = [

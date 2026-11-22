@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { DESKS, DESK_BY_ID } from '../desks'
+import { DESKS, DESK_BY_ID, subjectSpec, executiveProblem } from '../desks'
 import { formatCredits } from '../format'
 import './inspector.css'
 
@@ -57,7 +57,9 @@ export default function Inspector({
   const recent = events.slice(-8).reverse()
   const needsConsent = spec.alwaysConsent || spec.consentFor?.some(k => (inputs[k] || '').trim())
   const rosterOpen = g => open[g] ?? (agent ? agent.group === g : g === 'identity')
-  const missing = !subject.trim() || spec.fields.some(f => f.required && !(inputs[f.key] || '').trim()) || (needsConsent && !consent)
+  const subjectText = subjectSpec(spec)
+  const execProblem = desk === 'company' ? executiveProblem(inputs) : ''
+  const missing = !!execProblem || !subject.trim() || spec.fields.some(f => f.required && !(inputs[f.key] || '').trim()) || (needsConsent && !consent)
 
   const submit = e => { e.preventDefault(); if (!running && !missing) onRun?.() }
   const rosterButton = a => (
@@ -142,16 +144,19 @@ export default function Inspector({
         </>}
         {section === 'run' && <form className="insp-sec insp-form" onSubmit={submit}>
           <h3>Live investigation</h3>
-          <label className="insp-f"><span>Subject</span>
+          <label className="insp-f"><span>{subjectText.label}</span>
             <input value={subject} maxLength={180} required onChange={e => setSubject?.(e.target.value)}
-              placeholder="The company or person being checked" />
+              placeholder={subjectText.placeholder} />
           </label>
 
           {spec.fields.map(f => (
             <label key={f.key} className="insp-f"><span>{f.label}{f.required ? '' : ' (optional)'}</span>
               {f.long
                 ? <textarea rows={3} value={inputs[f.key] || ''} required={f.required} placeholder={f.placeholder} onChange={e => setInputs?.({ ...inputs, [f.key]: e.target.value })} />
-                : <input value={inputs[f.key] || ''} required={f.required} placeholder={f.placeholder} onChange={e => setInputs?.({ ...inputs, [f.key]: e.target.value })} />}
+                : <input value={inputs[f.key] || ''} required={f.required} placeholder={f.placeholder} onChange={e => setInputs?.({ ...inputs, [f.key]: e.target.value })}
+                    aria-invalid={f.key === 'executive_name' && !!execProblem} aria-describedby={f.hint ? `insp-${f.key}-hint` : undefined} />}
+              {f.hint && <small className="insp-hint" id={`insp-${f.key}-hint`}>{f.hint}</small>}
+              {f.key === 'executive_name' && execProblem && <small className="insp-hint warn" role="alert">{execProblem}</small>}
             </label>
           ))}
 

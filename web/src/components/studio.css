@@ -60,3 +60,7 @@
 @media (max-width: 560px) { .fee { grid-template-columns: 1fr; } }
 
 .live-feed {display:grid;gap:5px;padding:12px 0;font: .78rem var(--mono)} .live-feed div{display:flex;justify-content:space-between;gap:12px}.live-feed b{color:var(--clear)}
+
+.field .hint { color: var(--dim); font-size: .78rem; line-height: 1.35; }
+.field .hint.warn { color: #ff9b86; }
+.field input[aria-invalid="true"] { border-color: #5c2b1e; }

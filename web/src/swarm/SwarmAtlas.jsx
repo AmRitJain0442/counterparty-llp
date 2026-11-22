@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useRef, useState } from 'react'
 import SwarmMap from './SwarmMap'
 import Inspector from './Inspector'
-import { DESKS } from '../desks'
+import { DESKS, executiveProblem } from '../desks'
 import { Mark } from '../components/Logo'
 import { streamCase } from '../streamCase'
 import './atlas.css'
@@ -80,6 +80,8 @@ export default function SwarmAtlas({onFile,desk,onDesk,cases=[]}) {
   function inspect(id) {setSelected(id);setPanel(true);setSection('agents');setSearch(null)}
   async function run(){
     if(inflight.current)return
+    const problem=desk==='company'?executiveProblem(inputs):''
+    if(problem){setError(problem);setPanel(true);setSection('run');return}
     const controller=new AbortController()
     inflight.current=controller
     setRunning(true);setSelected(null);setError('');setRecord(null);setEvents([]);setPlayhead(null);setPanel(true);setSection('trace')

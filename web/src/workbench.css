@@ -14,3 +14,7 @@
 .provider-room section {margin:0 0 36px}.provider-room table {border-collapse:collapse;width:100%;font-size:.9rem}
 .provider-room td,.provider-room th {text-align:left;padding:9px 10px;border-bottom:1px solid #403d30}.provider-room section {overflow:auto}
 @media(max-width:680px){.bench-grid {grid-template-columns:1fr}}
+
+.bench-hint{color:#928b77;font-size:.78rem;line-height:1.35}
+.bench-hint.warn{color:#ffb59c}
+.bench-grid input[aria-invalid="true"]{border-color:#ff6a3d}

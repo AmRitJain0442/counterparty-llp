@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { DESKS, DESK_BY_ID } from '../desks'
+import { DESKS, DESK_BY_ID, subjectSpec, executiveProblem } from '../desks'
 import { streamCase } from '../streamCase'
 import FlowDiagram from './FlowDiagram'
 import './studio.css'
@@ -18,6 +18,8 @@ export default function DeskStudio({ deskId, onDeskChange, onFiled }) {
   const values = inputs[deskId] || {}
   const subject = subjects[deskId] || ''
   const consent = !!consents[deskId]
+  const subjectText = subjectSpec(desk)
+  const execProblem = deskId === 'company' ? executiveProblem(values) : ''
   const needsConsent = (desk.alwaysConsent || desk.consentFor?.some(k => (values[k] || '').trim()))
   const setValue = (key, value) => setInputs(all => ({ ...all, [deskId]: { ...all[deskId], [key]: value } }))
 
@@ -34,7 +36,8 @@ export default function DeskStudio({ deskId, onDeskChange, onFiled }) {
   async function submit(event) {
     event.preventDefault()
     setError('')
-    if (!subject.trim()) { setError('Enter who or what this live inquiry is about.'); return }
+    if (!subject.trim()) { setError(subjectText.error); return }
+    if (execProblem) { setError(execProblem); document.getElementById('company-executive_name')?.focus(); return }
     abort.current?.abort()
     abort.current = new AbortController()
     setBusy(true)
@@ -73,9 +76,9 @@ export default function DeskStudio({ deskId, onDeskChange, onFiled }) {
           </header>
 
           <label className="field">
-            <span>Subject</span>
+            <span>{subjectText.label}</span>
             <input id={`subject-${deskId}`} value={subject} maxLength={180} required
-              placeholder="The company or person being checked"
+              placeholder={subjectText.placeholder}
               onChange={e => setSubjects(all => ({ ...all, [deskId]: e.target.value }))} />
           </label>
 
@@ -86,7 +89,10 @@ export default function DeskStudio({ deskId, onDeskChange, onFiled }) {
                 ? <textarea id={`${deskId}-${f.key}`} rows={3} maxLength={2000} value={values[f.key] || ''} required={f.required}
                     placeholder={f.placeholder} onChange={e => setValue(f.key, e.target.value)} />
                 : <input id={`${deskId}-${f.key}`} maxLength={300} value={values[f.key] || ''} required={f.required}
+                    aria-invalid={f.key === 'executive_name' && !!execProblem} aria-describedby={f.hint ? `${deskId}-${f.key}-hint` : undefined}
                     placeholder={f.placeholder} onChange={e => setValue(f.key, e.target.value)} />}
+              {f.hint && <small className="hint" id={`${deskId}-${f.key}-hint`}>{f.hint}</small>}
+              {f.key === 'executive_name' && execProblem && <small className="hint warn" role="alert">{execProblem}</small>}
             </label>
           ))}
 

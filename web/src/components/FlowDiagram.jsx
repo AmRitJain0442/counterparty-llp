@@ -21,7 +21,7 @@ export default function FlowDiagram({ desk, values }) {
     const c = (x2 - x1) / 2
     return `M${x1} ${y1} C${x1 + c} ${y1}, ${x2 - c} ${y2}, ${x2} ${y2}`
   }
-  const sourceLit = s => s.from.some(filled)
+  const sourceLit = s => !(desk.id === 'company' && s.id === 'jobs' && filled('executive_name')) && s.from.some(filled)
   const anyLit = desk.sources.some(sourceLit)
 
   return (
