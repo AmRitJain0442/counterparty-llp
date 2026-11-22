@@ -3,12 +3,14 @@ from concurrent.futures import ThreadPoolExecutor
 from contextvars import copy_context
 import re
 from .providers import run_live
+from .identity import resolve_public_ids
 
 
 def collect_live(desk, subject, consent=False, inputs=None):
     supplied = inputs if isinstance(inputs, dict) else {}
     safe = {k: str(supplied[k])[:500] for k in
             ('domain', 'sender_domain', 'person_url', 'ifsc', 'orgnr', 'cik', 'claim', 'lei') if k in supplied}
+    safe = resolve_public_ids(desk, subject, safe)
     calls = {}
     person = safe.get('person_url', '')
     if person and consent is True and re.fullmatch(r'https://(?:www\.)?linkedin\.com/in/[A-Za-z0-9_%\-]+/?', person):
