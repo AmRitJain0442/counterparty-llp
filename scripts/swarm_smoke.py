@@ -52,12 +52,72 @@ def run_demo(page, inspector, agent_ids):
     return len(events)
 
 
+def test_camera(page, view, diagram, *, mobile, reduced):
+    meter = view.get_by_role("button", name="Fit entire map")
+    map_layer = diagram.locator(".map-geometry")
+    def origin():
+        return map_layer.evaluate("""el => {
+            const m = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+            return [m.e, m.f];
+        }""")
+
+    expect(meter).to_have_text("100%")
+    if reduced:
+        assert diagram.evaluate("el => el.getAnimations({subtree:true}).filter(a=>a.effect?.getTiming().duration>1).length") == 0
+    else:
+        page.wait_for_function("window.entranceStages.has('atlas-enter-trace')", timeout=3500)
+        page.wait_for_function("!document.querySelector('.atlas-entering')", timeout=3500)
+        stages=page.evaluate("Array.from(window.entranceStages)")
+        assert set(stages) >= {"atlas-enter-orbit","atlas-enter-strip","atlas-enter-trace","atlas-enter-name"}
+
+    view.get_by_role("button", name="Zoom in", exact=True).click()
+    expect(meter).not_to_have_text("100%")
+    meter.click()
+    expect(meter).to_have_text("100%")
+
+    center = diagram.evaluate("""svg => {
+        const point = new DOMPoint(450,365).matrixTransform(svg.getScreenCTM());
+        return {x:point.x, y:point.y};
+    }""")
+    x, y = center["x"], center["y"]
+    if mobile:
+        touch = page.context.new_cdp_session(page)
+        def pinch(state, distance):
+            points = [] if distance is None else [{"x":x-distance,"y":y,"id":0},{"x":x+distance,"y":y,"id":1}]
+            touch.send("Input.dispatchTouchEvent", {"type":state,"touchPoints":points})
+        pinch("touchStart", 25)
+        pinch("touchMove", 45)
+        pinch("touchEnd", None)
+        expect(meter).not_to_have_text("100%")
+        touch.detach()
+    else:
+        page.mouse.move(x+20,y)
+        page.mouse.wheel(0,-160)
+        expect(meter).not_to_have_text("100%")
+        page.wait_for_timeout(600)
+        start = origin()
+        page.mouse.move(x,y)
+        page.mouse.down()
+        page.mouse.move(x+72,y+38,steps=8)
+        page.mouse.up()
+        page.wait_for_timeout(600)
+        assert sum(abs(a-b) for a,b in zip(start,origin())) > 10, "Drag did not pan the map"
+        expect(view.get_by_label("Agent inspector")).to_be_hidden()
+    meter.click()
+    expect(meter).to_have_text("100%")
+
+
 def check_view(browser, url, *, mobile=False, reduced=False):
     page = browser.new_page(viewport={"width": 390 if mobile else 1440, "height": 844 if mobile else 900},
                             is_mobile=mobile, has_touch=mobile, reduced_motion="reduce" if reduced else "no-preference")
     page.set_default_timeout(3500)
     page.route("**/api/**", lambda r: r.continue_() if r.request.method == "GET" else r.abort())
+    page.add_init_script("""window.entranceStages=new Set();
+      document.addEventListener('animationstart',e=>{
+        if(e.animationName.startsWith('atlas-enter-'))window.entranceStages.add(e.animationName);
+      },true);""")
     page.goto(url, wait_until="domcontentloaded", timeout=8000)
+    page.reload(wait_until="domcontentloaded")
     view = page.get_by_role("region", name="Agent swarm workflow")
     diagram = view.get_by_role("group", name="Investigation swarms and agent handoffs")
     inspector = view.get_by_role("complementary", name="Agent inspector")
@@ -68,6 +128,7 @@ def check_view(browser, url, *, mobile=False, reduced=False):
     if inspector.is_visible():
         inspector.get_by_role("button", name="Close inspector").click()
     expect(inspector).to_be_hidden()
+    test_camera(page, view, diagram, mobile=mobile, reduced=reduced)
     control = "Play" if reduced else "Pause"
     expect(view.get_by_role("button", name=f"{control} data flow animation")).to_be_visible()
     frames = {diagram.screenshot()}

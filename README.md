@@ -22,7 +22,7 @@ Open **http://127.0.0.1:8080**. On macOS or Linux use `python3.12 -m venv .venv`
 
 ## Swarm map
 
-The first screen combines a radial workflow and an inspector. Select a node to focus its incoming and outgoing handoffs, or use **Find** to locate an agent. The inspector opens beside the map on desktop and as a bottom sheet on phones. **Run** opens the current desk’s intake. **Trace** replays a filed investigation without calling providers.
+The first screen combines a radial workflow and an inspector. Drag to pan, use the wheel or pinch to zoom, and click the zoom percentage to fit the map. Select a node to focus its handoffs or use **Find** to locate an agent. On reload the rings, sectors and connections draw in sequence. Reduced-motion mode opens directly on the settled map. The inspector opens beside the map on desktop and as a bottom sheet on phones. **Run** opens the current desk’s intake. **Trace** replays a filed investigation without calling providers.
 
 Twelve workers handle each case. Seven do deterministic work such as indexing sources, checking dates and applying evidence rules. Five live Gemini reviewers run in three stages. Both analysts see the dated source cards. Both challengers receive both analyses, and the review partner receives both challenges. Each reviewer returns an assessment and source references. Missing reviews or requests for material evidence refer a proposed adverse finding or forecast to a human. A completed run seals the reports and their dependency events into the case receipt. Demo runs use curated evidence and local review logic.
 
