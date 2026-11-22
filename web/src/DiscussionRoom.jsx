@@ -9,6 +9,20 @@ const roles = [
   ['counsel', 'Opposing counsel', 'Test the proposed finding', '#fc8763'],
   ['partner', 'Partner review', 'File the decision', '#c6afe0'],
 ]
+function FiledReport({report, evidence, children}) {
+  const cards = (report.refs || []).map(id => evidence.get(id)).filter(Boolean)
+  return <details className="filed-report">
+    <summary>{report.name} <small>{report.status}</small></summary>
+    {report.persona && <p className="report-persona">{report.persona}</p>}
+    <p>{report.detail}</p>
+    {report.assessment === 'needs_evidence' && <p className="report-referral">Further evidence requested</p>}
+    {cards.length > 0 && <details className="report-citations"><summary>Source cards ({cards.length})</summary>
+      <ul>{cards.map(card => <li key={card.id}>{card.label} <small>{card.source}</small></li>)}</ul>
+    </details>}
+    {children}
+  </details>
+}
+
 function observations(record, role) {
   const items = record?.evidence || []
   if (role === 'counsel') return [
@@ -39,6 +53,9 @@ export default function DiscussionRoom({initialCase}) {
   }, [])
   const record = records.find(row => row.id === selected)
   const evidence = record ? observations(record, roles[focus][0]) : []
+  const reports = record?.swarm_reports || []
+  const leads = reports.filter(report => !report.parent_id)
+  const cards = new Map((record?.evidence || []).map(card => [card.id, card]))
   return <section className="discussion-room">
     <div className="council-title"><div><small>INVESTIGATION WORKSPACE</small><h1>Discussion room</h1></div>
       {records.length > 0 && <label>Case file<select value={selected} onChange={e => setSelected(e.target.value)}>
@@ -46,10 +63,17 @@ export default function DiscussionRoom({initialCase}) {
       </select></label>}</div>
     {record?.swarm_reports?.length > 0 && <section className="room-trace">
       <a href={'/?case='+encodeURIComponent(record.id)+'#swarm'}>Open this case in the swarm inspector ↗</a>
-      <p>{record.swarm_reports.length} agent reports · {record.swarm_events.filter(e=>e.event==='end').length} completed handoffs</p>
+      <p>{reports.length > leads.length ? `${leads.length} leads · ${reports.length - leads.length} specialists` : `${leads.length} agent reports`}</p>
       <div>{['identity','discovery','challenge','decision'].map(group=><section key={group}>
         <h2>{group}</h2>
-        {record.swarm_reports.filter(a=>a.group===group).map(a=><details key={a.agent_id}><summary>{a.name} <small>{a.status}</small></summary><p>{a.detail}</p></details>)}
+        {leads.filter(lead => lead.group === group).map(lead => {
+          const team = reports.filter(report => report.parent_id === lead.agent_id)
+          return <FiledReport key={lead.agent_id} report={lead} evidence={cards}>
+            {team.length > 0 && <div className="filed-team"><h3>Specialist reports</h3>
+              {team.map(report => <FiledReport key={report.agent_id} report={report} evidence={cards}/>)}
+            </div>}
+          </FiledReport>
+        })}
       </section>)}</div></section>}
     {record && !record.swarm_reports?.length && <p>This case predates agent tracing. Its filed evidence is available below.</p>}
     <div className="room-evidence-nav" aria-label="Filed evidence by role">

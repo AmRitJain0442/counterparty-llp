@@ -27,6 +27,12 @@
 .room-trace details {border-top:1px solid #433c30;padding:9px 0;font-size:13px}
 .room-trace summary {cursor:pointer}.room-trace summary small {color:#ac9f83}
 .room-trace p {color:#b9ae97;overflow-wrap:anywhere}
+.filed-team {border-inline-start:1px solid #665342;padding-inline-start:12px;margin-block:14px 2px}
+.filed-team h3 {color:#e6ccb0;font:600 12px/1.4 monospace}
+.filed-report .report-persona {color:#e1d7c5;font-style:italic}
+.filed-report .report-referral {color:#f3a07a}
+.filed-report .report-citations {border:0;color:#b9ae97;padding:0}
+.report-citations ul {padding-inline-start:18px;line-height:1.55}
 .room-evidence-nav {display:flex;flex-wrap:wrap;gap:6px;margin-top:18px}
 .room-evidence-nav button {background:#211f18;color:#d6cbb2;border:1px solid #4b4334;cursor:pointer;padding:6px 9px}
 .room-evidence-nav button[aria-pressed=true] {color:#f49d73;border-color:#a37759}
