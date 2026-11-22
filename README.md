@@ -18,7 +18,13 @@ Pop-Location
 
 Open **http://127.0.0.1:8080**. On macOS or Linux use `python3.12 -m venv .venv`, install the requirements with `.venv/bin/pip`, build the web app as above, and run `.venv/bin/python -m uvicorn backend.main:app --port 8080`. The production bundle and API share one origin.
 
-**Demo** runs the four curated cases locally, with source labels and dates. **Live** spends credits on the configured Crustdata account and uses Vertex AI for the reviewer's draft. Each completed run creates a ledger entry. SQLite defaults to `.local/ledger.sqlite3`.
+**Demo** runs the four curated cases locally, with source labels and dates. **Live** spends credits on the configured Crustdata account and runs two Gemini analysts, two challengers and a review partner through Vertex AI. Each completed run creates a ledger entry. SQLite defaults to `.local/ledger.sqlite3`.
+
+## Swarm map
+
+The first screen combines a radial workflow and an inspector. Select a node to focus its incoming and outgoing handoffs, or use **Find** to locate an agent. The inspector opens beside the map on desktop and as a bottom sheet on phones. **Run** opens the current deskâ€™s intake. **Trace** replays a filed investigation without calling providers.
+
+Twelve workers handle each case. Seven do deterministic work such as indexing sources, checking dates and applying evidence rules. Five live Gemini reviewers run in three stages. Both analysts see the dated source cards. Both challengers receive both analyses, and the review partner receives both challenges. Each reviewer returns an assessment and source references. Missing reviews or requests for material evidence refer a proposed adverse finding or forecast to a human. A completed run seals the reports and their dependency events into the case receipt. Demo runs use curated evidence and local review logic.
 
 ## Credentials
 
@@ -39,6 +45,7 @@ The Windows launcher also reads the current user's DPAPI-protected Crustdata tok
 |---|---|
 | POST /api/cases | File a demo or live investigation |
 | POST /api/cases/stream | Same investigation with newline-delimited progress and a final case |
+| GET /api/swarms/{desk} | Twelve named workers, their assignments and their dependencies |
 | GET /api/cases | Ledger in reverse creation order |
 | GET /api/cases/{id} | Stored evidence, decision, cost and receipt |
 | GET /api/capabilities | Current account balance, prices and entitlements |
@@ -54,7 +61,7 @@ Keep private ingress on hosted deployments. Everyone with application access sha
 |---|---|---|
 | [Crustdata](https://docs.crustdata.com/general/introduction) | Identity, profile enrichment, workforce searches | Supplied account. The meter uses the returned credit header. |
 | [Google Cloud](https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts/quickstart-multimodal) | Gemini drafting, optional persistent cloud services | Supplied GCP project, usage billed by Google. |
-| [Brønnøysund Register Centre](https://data.brreg.no/enhetsregisteret/api/docs/index.html) | Norwegian entities, bankruptcy status and statutory roles | Free open-data endpoints |
+| [BrÃ¸nnÃ¸ysund Register Centre](https://data.brreg.no/enhetsregisteret/api/docs/index.html) | Norwegian entities, bankruptcy status and statutory roles | Free open-data endpoints |
 | [SEC EDGAR](https://www.sec.gov/search-filings/edgar-application-programming-interfaces) | Company submissions and dated 8-K items | Free public data API, identifying user agent required |
 | [RDAP registries](https://data.iana.org/rdap/dns.json) | Sender-domain registration dates for supported suffixes | Free public lookups subject to each registry's limits |
 | [Razorpay IFSC](https://github.com/razorpay/ifsc) | Indian branch and bank metadata | Free public lookup |

@@ -28,7 +28,7 @@ export default function SwarmAtlas({onFile,desk,onDesk,cases=[]}) {
   const requestedCase=useRef(new URLSearchParams(location.search).get('case'))
   const active=agents.find(a=>a.id===selected)
   const trace=playhead===null?events:events.slice(0,playhead)
-  const visibleEvents=trace.filter(e=>e.agent_id)
+  const visibleEvents=trace.filter(e=>e.agent_id||e.collection_agent)
   const groupCount=new Set(agents.map(a=>a.group)).size
   const preview=!running&&!record&&events.length===0
   useEffect(()=>{
@@ -64,7 +64,7 @@ export default function SwarmAtlas({onFile,desk,onDesk,cases=[]}) {
     if(inflight.current)return
     const controller=new AbortController()
     inflight.current=controller
-    setRunning(true);setRunMode(mode);setError('');setRecord(null);setEvents([]);setPlayhead(mode==='demo'&&playing?0:null);setPanel(true);setSection('trace')
+    setRunning(true);setSelected(null);setRunMode(mode);setError('');setRecord(null);setEvents([]);setPlayhead(mode==='demo'&&playing?0:null);setPanel(true);setSection('trace')
     try {
       const result=await streamCase({desk,mode,subject,consent,inputs},e=>{if(!controller.signal.aborted)setEvents(items=>[...items,e])},controller.signal)
       if(!controller.signal.aborted){setRecord(result);onFile?.(result)}
@@ -74,7 +74,7 @@ export default function SwarmAtlas({onFile,desk,onDesk,cases=[]}) {
   function saved(id) {
     const found=cases.find(c=>c.id===id)
     if(!found||running)return
-    setRecord(found);setRunMode(found.mode);setEvents(found.swarm_events||[]);setPlayhead(playing?0:null);setSection('trace')
+    setSelected(null);setRecord(found);setRunMode(found.mode);setEvents([...(found.collection_events||[]),...(found.swarm_events||[])]);setPlayhead(playing?0:null);setSection('trace')
   }
   useEffect(()=>{
     if(!requestedCase.current || !agents.length) return
@@ -86,7 +86,7 @@ export default function SwarmAtlas({onFile,desk,onDesk,cases=[]}) {
     setPanel(true)
   },[cases,desk,agents,onDesk])
   function replay(){if(!events.length)return;setPlaying(true);setPlayhead(0)}
-  return <section id="swarm" className={'atlas'+(panel?' inspect-open':'')} aria-label="Agent swarm workflow">
+  return <section id="swarm" className={'atlas'+(panel?' inspect-open':'')+(selected?' agent-focus':'')} aria-label="Agent swarm workflow">
     <header className="atlas-top">
       <nav aria-label="Workflow views"><a href="#swarm" className="current">Swarm map</a><a href="#desks">Desks</a><a href="#ledger">Ledger</a></nav>
       <a href="#swarm" className="atlas-brand"><Mark size={21}/> COUNTERPARTY <em>LLP</em></a>
@@ -95,7 +95,7 @@ export default function SwarmAtlas({onFile,desk,onDesk,cases=[]}) {
     <div className="atlas-layout">
       <div className="atlas-field">
         <div className="atlas-crumb">Firm <span>/</span> {DESKS.find(d=>d.id===desk)?.name} desk <span>/</span> <b>Swarm map</b></div>
-        <SwarmMap agents={agents} selected={selected} onSelect={inspect} events={visibleEvents} running={running} preview={preview} playing={playing} onToggle={()=>setPlaying(v=>!v)}/>
+        <SwarmMap agents={agents} selected={selected} onSelect={inspect} events={visibleEvents} reports={playhead===null?record?.swarm_reports:undefined} running={running} preview={preview} playing={playing} onToggle={()=>{if(!playing&&record&&playhead===null)replay();else setPlaying(v=>!v)}}/>
         <div className="atlas-caption"><h1>Counterparty investigation map.</h1>
           <p>Select an agent to trace its witnesses, handoffs and findings.</p>
           <button onClick={()=>{setPanel(true);setSection('run')}}>Open an investigation ↗</button>
@@ -104,7 +104,7 @@ export default function SwarmAtlas({onFile,desk,onDesk,cases=[]}) {
       </div>
       {panel&&<div className="atlas-dock"><Inspector {...{desk,agents,events:trace,running,record,mode,setMode,subject,setSubject,inputs,setInputs,consent,setConsent,error,
         section,setSection,onReplay:replay,runMode,replaying:playhead!==null}} agent={active} onSelect={inspect} onClose={()=>{setPanel(false);setSelected(null)}} onRun={run}
-        onDesk={v=>{if(!running)onDesk(v)}} caseOptions={cases.filter(c=>c.desk===desk&&c.swarm_events?.length).map(c=>({id:c.id,label:c.subject}))} onCase={saved}/></div>}
+        onDesk={v=>{if(!running)onDesk(v)}} caseOptions={cases.filter(c=>c.desk===desk&&c.swarm_events?.length).map(c=>({id:c.id,label:c.subject+' · '+c.id.slice(0,6)}))} onCase={saved}/></div>}
     </div>
     {error&&!panel&&<p role="alert">{error}</p>}
     {search!==null&&<div className="atlas-search" onClick={()=>setSearch(null)}><div role="dialog" aria-modal="true" aria-label="Find an agent" onClick={e=>e.stopPropagation()}>

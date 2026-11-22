@@ -88,7 +88,11 @@ export default function Inspector({
             <div><dt>Status</dt><dd>{label(ev?.status)}</dd></div>
           </dl>
           {report && <details className="agent-report"><summary>Read agent report</summary><p>{report.detail}</p>
-            {report.refs.map(id => <p key={id}>{record.evidence.find(e=>e.id===id)?.label || id}</p>)}</details>}
+            {report.assessment && <p>Assessment · {report.assessment.replaceAll('_',' ')}</p>}
+            {report.refs.map(id => {
+              const row = record.evidence.find(e=>e.id===id)
+              return row && <details key={id}><summary>{row.label} · {row.source}</summary><p>{row.detail}</p><small>{row.as_of}</small></details>
+            })}</details>}
         </section>}
         <section className="insp-sec">
           <h3>Swarm roster <span>{agents.length} agents</span></h3>
@@ -167,6 +171,7 @@ export default function Inspector({
             <h3>Filed decision</h3>
             <div className="insp-verdict">{record.verdict}</div>
             {record.summary && <p>{record.summary}</p>}
+            {record.council_decision && <p>Council · {record.council_decision.disposition}{record.council_decision.referred_by.length ? ' · ' + record.council_decision.referred_by.join(', ') : ''}</p>}
             {record.draft && <p className="insp-draft">{record.draft}</p>}
             {Array.isArray(record.evidence) && record.evidence.length > 0 && (
               <div className="insp-ev">
