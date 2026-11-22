@@ -1,0 +1,51 @@
+.case-file { border: 1px solid var(--line); background: var(--raise); padding: clamp(18px, 3.4vw, 36px); display: grid; gap: 24px; min-width: 0; scroll-margin-top: 80px; }
+.case-file.empty { color: var(--dim); gap: 8px; border-style: dashed; border-color: var(--line-2); background: transparent; }
+.case-head { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 20px 40px; align-items: end; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
+@media (max-width: 760px) { .case-head { grid-template-columns: 1fr; } }
+.verdict-block { display: grid; gap: 6px; }
+.verdict-block .label { color: var(--c); }
+.verdict { font-size: clamp(2rem, 5.2vw, 3.8rem); line-height: .95; letter-spacing: -.05em; font-weight: 850; text-transform: uppercase; max-width: 12ch; overflow-wrap: anywhere; }
+.case-meta { display: grid; gap: 10px; min-width: 0; }
+.case-meta h4 { font-size: 1.25rem; font-weight: 700; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.chip { font: 500 .8rem var(--mono); font-variation-settings: 'MONO' 1; color: var(--ink-2); border: 1px solid var(--line-2); padding: 2px 9px; }
+.case-summary { font-size: 1.12rem; line-height: 1.55; max-width: 70ch; }
+.draft { border-left: 3px solid var(--sign); padding: 4px 0 4px 16px; display: grid; gap: 4px; max-width: 74ch; }
+.draft p { color: var(--ink-2); }
+.case-grid { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 6fr); gap: clamp(20px, 4vw, 48px); }
+@media (max-width: 900px) { .case-grid { grid-template-columns: 1fr; } }
+.case-grid section { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.case-grid h4, .case-flows h4 { margin: 0; }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; border-left: 1px solid var(--line-2); }
+.steps li { position: relative; padding: 0 0 18px 20px; display: grid; gap: 4px; }
+.steps li::before { content: ''; position: absolute; left: -5px; top: 6px; width: 9px; height: 9px; background: var(--bg); border: 2px solid currentColor; }
+.steps li > div { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.steps b { color: var(--ink); }
+.steps p { color: var(--dim); font-size: .88rem; overflow-wrap: anywhere; }
+
+.witness-line { display: flex; flex-wrap: wrap; gap: 4px 16px; font: 500 .78rem var(--mono); font-variation-settings: 'MONO' 1; color: var(--dim); }
+.evidence { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.evidence li { border-bottom: 1px solid var(--line); }
+.evidence summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 12px 4px; cursor: pointer; list-style: none; align-items: center; }
+.evidence summary::-webkit-details-marker { display: none; }
+.evidence summary::before { content: none; }
+.evidence summary:hover { background: var(--raise-2); }
+.e-label { font-weight: 650; grid-column: 1; }
+.e-source { grid-column: 1; grid-row: 2; color: var(--dim); font-size: .82rem; }
+.evidence summary .pill { grid-column: 2; grid-row: 1 / span 2; }
+.evidence details[open] summary { background: var(--raise-2); box-shadow: inset 3px 0 var(--c); padding-left: 14px; }
+.e-body { padding: 4px 4px 18px 14px; display: grid; gap: 12px; }
+.e-body p { color: var(--ink-2); overflow-wrap: anywhere; max-width: 68ch; }
+.e-body dl { display: flex; flex-wrap: wrap; gap: 6px 28px; margin: 0; }
+.e-body dt { font: 600 .66rem var(--mono); font-variation-settings: 'MONO' 1; letter-spacing: .09em; text-transform: uppercase; color: var(--dim); }
+.e-body dd { margin: 0; font-size: .9rem; }
+.e-body a { color: var(--hot); }
+.none { color: var(--dim); }
+
+.case-flows { display: grid; gap: 12px; padding-top: 22px; border-top: 1px solid var(--line); }
+.receipt { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 16px; align-items: center; padding-top: 20px; border-top: 1px solid var(--line); }
+.receipt code { color: var(--ink); overflow-wrap: anywhere; }
+.receipt-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+.receipt-check { grid-column: 1 / -1; font-size: .88rem; min-height: 1.4em; }
+.btn.small { padding: 7px 12px; font-size: .84rem; }

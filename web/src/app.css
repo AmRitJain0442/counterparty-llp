@@ -1,0 +1,24 @@
+.hero-side { display: grid; gap: 4px; align-content: end; }
+.hero .firm-map { margin-top: clamp(28px, 4vw, 48px); }
+.case-slot { margin-top: clamp(20px, 3vw, 32px); }
+.specimen { display: grid; gap: 12px; justify-items: start; }
+.specimen .sankey { width: 100%; }
+
+.stages { list-style: none; margin: 0 0 clamp(28px, 5vw, 52px); padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); counter-reset: stage; border-top: 1px solid var(--line-2); }
+.stages li { counter-increment: stage; display: grid; gap: 4px; padding: 16px 16px 0 0; align-content: start; }
+.stages li::before { content: counter(stage, decimal-leading-zero); font: 600 .7rem var(--mono); font-variation-settings: 'MONO' 1; color: var(--hot); letter-spacing: .08em; }
+.stages b { font-size: 1.02rem; letter-spacing: -.01em; }
+.stages span { color: var(--dim); font-size: .88rem; }
+@media (max-width: 900px) { .stages { grid-template-columns: 1fr 1fr; gap: 0 16px; } .stages li { padding-bottom: 14px; } }
+@media (max-width: 480px) { .stages { grid-template-columns: 1fr; } }
+
+.rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0; margin: 0; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.rules div { padding: 20px 22px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); display: grid; gap: 8px; align-content: start; }
+.rules dt { font-weight: 700; letter-spacing: -.01em; text-wrap: balance; }
+.rules dd { margin: 0; color: var(--ink-2); font-size: .92rem; }
+
+.rooms { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.rooms a { display: grid; gap: 6px; padding: 18px; border: 1px solid var(--line); background: var(--raise); text-decoration: none; height: 100%; transition: border-color .15s, background .15s; }
+.rooms a:hover { border-color: var(--hot); background: var(--raise-2); }
+.rooms b { font-size: 1.05rem; letter-spacing: -.015em; }
+.rooms span { color: var(--dim); font-size: .88rem; }

@@ -1,0 +1,20 @@
+.sankey { margin: 0; display: grid; gap: 12px; }
+.sankey-scroll { overflow-x: auto; border: 1px solid var(--line); background: var(--raise); }
+.sankey svg { display: block; width: 100%; min-width: 720px; height: auto; }
+.ribbon { fill: none; stroke: var(--c); stroke-opacity: .34; stroke-linecap: butt; transition: stroke-opacity .15s; outline: none; cursor: default; }
+.ribbon.on, .ribbon:focus-visible { stroke-opacity: .85; }
+.ribbon.dim { stroke-opacity: .1; }
+.snode rect { fill: var(--ink-2); }
+.snode.dim { opacity: .35; }
+.s-name, .s-count { paint-order: stroke; stroke: var(--raise); stroke-width: 4px; stroke-linejoin: round; }
+.s-name { font: 650 13px var(--font); fill: var(--ink); }
+.s-count { font: 500 11.5px var(--mono); font-variation-settings: 'MONO' 1; fill: var(--dim); font-variant-numeric: tabular-nums; }
+.sankey figcaption { color: var(--ink-2); font-size: .9rem; min-height: 1.5em; }
+.sankey-empty { color: var(--dim); padding: 28px; border: 1px dashed var(--line-2); }
+.sankey-table summary { cursor: pointer; color: var(--dim); font-size: .85rem; width: fit-content; }
+.sankey-table summary:hover { color: var(--ink); }
+.table-scroll { overflow-x: auto; margin-top: 10px; }
+.sankey-table table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+.sankey-table th, .sankey-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.sankey-table th { font: 600 .68rem var(--mono); font-variation-settings: 'MONO' 1; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+.sankey-table td:last-child, .sankey-table th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
