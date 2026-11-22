@@ -13,13 +13,13 @@ function arc(a,b,r) {
 }
 
 function geometry(agents, reports) {
-  const sorted = Object.keys(GROUPS).flatMap(g=>agents.filter(a=>a.group===g))
+  const sorted = Object.keys(GROUPS).flatMap(g=>agents.filter(a=>!a.parent_id && a.group===g))
   const step=2*Math.PI/Math.max(sorted.length,1)
   return sorted.map((a,i)=>{
     const angle=-Math.PI/2+step*(i+.45)
     const pos=polar(angle,132+(i*17)%21)
     const report=reports.find(r=>r.agent_id===a.id)
-    const bandCount=report ? Math.min(8,report.refs.length) : 5
+    const bandCount=report ? Math.min(8,report.refs?.length || 0) : 5
     const strips=Array.from({length:bandCount},(_,k)=>{
       const t=angle+(k-(bandCount-1)/2)*step*.78/Math.max(bandCount,4)
       const w=Math.min(.022+((i+k*7)%9)*.002,step*.25/bandCount)
@@ -30,14 +30,19 @@ function geometry(agents, reports) {
       }).join(' ')
       return {path, stem:curve(pos,polar(angle,177),polar(t,168),polar(t,192))}
     })
-    return {...a,i,angle,pos,step,strips,report}
+    const team=agents.filter(child=>child.parent_id===a.id)
+    const children=team.map((child,k)=>{
+      const offset=((k+.5)/team.length-.5)*step*.95
+      return {...child,pos:polar(angle+offset,177)}
+    })
+    return {...a,i,angle,pos,step,strips,report,children}
   })
 }
 
 export default function SwarmMap({agents,selected,onSelect,events,running,preview,playing,onToggle,reports=EMPTY_REPORTS}) {
   const uid=useId().replace(/[^\w-]/g,'')
   const nodes=useMemo(()=>geometry(agents,reports),[agents,reports])
-  const index=Object.fromEntries(nodes.map(n=>[n.id,n]))
+  const index=useMemo(()=>Object.fromEntries(nodes.flatMap(n=>[n,...n.children]).map(n=>[n.id,n])),[nodes])
   const status=Object.fromEntries(events.filter(e=>e.agent_id).map(e=>[e.agent_id,e.status]))
   const collecting=new Map()
   for (const e of events) {
@@ -51,8 +56,9 @@ export default function SwarmMap({agents,selected,onSelect,events,running,previe
       for(const dep of deps)if(index[dep])result.push([index[dep],target])
     }
     return result
-  },[nodes])
+  },[nodes,index])
   const focusNode=index[selected]
+  const familyId=focusNode?.parent_id || selected
   const svgRef=useRef(null)
   const [compact,setCompact]=useState(()=>window.matchMedia('(max-width:700px)').matches)
   useEffect(()=>{
@@ -76,6 +82,13 @@ export default function SwarmMap({agents,selected,onSelect,events,running,previe
     camera.fit()
     if(selected)onSelect(null)
   }
+  function selectProps(node) {
+    return {
+      role:'button',tabIndex:0,'data-agent-id':node.id,'aria-pressed':node.id===selected,
+      onClick:()=>{if(!camera.draggedRecently())onSelect(node.id)},
+      onKeyDown:e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onSelect(node.id)}},
+    }
+  }
   function mapKey(e) {
     if(e.ctrlKey||e.metaKey||e.altKey)return
     if(['+', '=', '-', '0','Home'].includes(e.key)){
@@ -91,7 +104,7 @@ export default function SwarmMap({agents,selected,onSelect,events,running,previe
       <g className="outer-orbits" fill="none"><circle cx="450" cy="365" r="284"/><circle cx="450" cy="365" r="184"/><circle cx="450" cy="365" r="111"/></g>
       {Array.from({length:120},(_,i)=><path key={i} className="degree" d={'M'+point(polar(i*Math.PI/60,279))+'L'+point(polar(i*Math.PI/60,i%5?281:285))}/>)}
       <g className="handoffs">{edges.map(([s,t],i)=>{
-        const hot=s.id===selected||t.id===selected, active=preview||status[t.id]==='running'
+        const hot=s.id===familyId||t.id===familyId, active=preview||status[t.id]==='running'
         const d=curve(s.pos,polar(s.angle,73),polar(t.angle,73),t.pos)
         const id=uid+'-edge-'+i
         return <g key={id}><path id={id} d={d} fill="none" stroke={hot?'#cfc4ac':'#aaa38e'} strokeOpacity={hot ? .86 : selected ? .13 : .44} strokeWidth={hot?1.15:.75}/>
@@ -109,9 +122,8 @@ export default function SwarmMap({agents,selected,onSelect,events,running,previe
         const side=Math.abs(Math.cos(n.angle))>.34
         const x=end[0]+(side?(right?8:-8):0), y=end[1]+(side?0:(end[1]<365?-8:13))
         const textAnchor=side?(right?'start':'end'):'middle'
-        return <g key={n.id} role="button" tabIndex="0" aria-pressed={focus} aria-label={n.name+' agent'} data-agent-id={n.id}
-          onClick={()=>{if(!camera.draggedRecently())onSelect(n.id)}} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onSelect(n.id)}}}
-          className={'agent-sector'+(focus?' selected':'')} style={{'--sector':color,'--order':n.i,opacity:!selected||focus||edges.some(([a,b])=>(a.id===selected&&b.id===n.id)||(b.id===selected&&a.id===n.id))?1:.36}}>
+        return <g key={n.id} {...selectProps(n)} aria-label={n.name+' agent'}
+          className={'agent-sector'+(focus?' selected':'')} style={{'--sector':color,'--order':n.i,opacity:!selected||n.id===familyId||edges.some(([a,b])=>(a.id===familyId&&b.id===n.id)||(b.id===familyId&&a.id===n.id))?1:.36}}>
           <path d={'M'+point(n.pos)+' L'+point(polar(n.angle-n.step*.45,272))+' '+point(polar(n.angle+n.step*.45,272))+'Z'} fill="transparent"/>
           {n.strips.map((v,k)=><g key={k}><path d={v.stem} fill="none" stroke={color} opacity={focus ? .84 : .45} strokeWidth=".8"/>
             {(active || (preview&&k===2)) && playing && <circle r={active?2.6:1.65} fill="#ef976f">
@@ -126,8 +138,39 @@ export default function SwarmMap({agents,selected,onSelect,events,running,previe
           <text x={x} y={y} textAnchor={compact?'middle':textAnchor} className="agent-name">{compact
             ? <><tspan x={x}>{n.name.split(' ')[0]}</tspan><tspan x={x} dy="16">{n.name.split(' ').slice(1).join(' ')}</tspan></>
             : n.name}</text>
-          <text x={x} y={y+12} textAnchor={textAnchor} className="agent-sub">{GROUPS[n.group]} swarm{n.report?' · '+n.report.refs.length+' refs':''}</text>
+          <text x={x} y={y+12} textAnchor={textAnchor} className="agent-sub">{GROUPS[n.group]} swarm{n.report?' · '+(n.report.refs?.length||0)+' refs':''}</text>
         </g>
+      })}
+      {nodes.map(lead=><g key={lead.id} opacity={!selected||familyId===lead.id?1:.4}>
+        {lead.children.map((child,i)=>{
+          const [x,y]=child.pos
+          const focused=selected===child.id
+          const working=status[child.id]==='running'
+          const returning=status[child.id] && !working && status[lead.id]==='running'
+          const path='M'+point(lead.pos)+'L'+point(child.pos)
+          const color=focused||working?'#ff996b':C[lead.group]
+          return <React.Fragment key={child.id}>
+            <path d={path} className="specialist-link" stroke={color}/>
+            {playing&&(working||returning||preview)&&<circle r="2.2" fill="#ff9768" pointerEvents="none">
+              <animateMotion path={path} keyPoints={returning?'1;0':'0;1'} keyTimes="0;1" calcMode="linear"
+                dur="1.5s" begin={-(lead.i+i)*.2+'s'} repeatCount="indefinite"/>
+            </circle>}
+            <g {...selectProps(child)} aria-label={child.name+', specialist for '+lead.name}
+              className="specialist-node" transform={'translate('+x+' '+y+')'} style={{color}}>
+              <title>{child.name} · {lead.name}</title>
+              <circle className="specialist-target" r="21" fill="transparent"/>
+              <circle r={focused?8:6.5} fill="#171611" stroke="currentColor" strokeWidth="1.4"/>
+              <path d="M0 -3.5 3.5 0 0 3.5 -3.5 0Z" fill="currentColor"/>
+            </g>
+          </React.Fragment>
+        })}
+      </g>)}
+      {index[familyId]?.children.map((child,i)=>{
+        const [x,y]=child.pos
+        const sibling=index[familyId].children[i===0?1:0]
+        const right=!sibling||x>sibling.pos[0]
+        return <text key={child.id} x={x+(right?11:-11)} y={y+3} textAnchor={right?'start':'end'}
+          className={'specialist-label'+(child.id===selected?' selected':'')}>{child.name}</text>
       })}
       </g>
     </svg>

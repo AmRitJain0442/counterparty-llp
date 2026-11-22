@@ -9,14 +9,14 @@ const GROUPS = [
   ['challenge', 'Challenge', 'Test competing explanations'],
   ['decision', 'Decision', 'Reconcile findings and file the case'],
 ]
-const STATUS_LABEL = { idle: 'Idle', queued: 'Queued', running: 'Running', done: 'Done', complete: 'Done', ok: 'Done', error: 'Failed', failed: 'Failed', blocked: 'Blocked', held: 'Held' }
+const STATUS_LABEL = { idle: 'Idle', queued: 'Queued', running: 'Running', done: 'Done', complete: 'Done', ok: 'Done', error: 'Failed', failed: 'Failed', blocked: 'Blocked', held: 'Held', unavailable: 'Unavailable' }
 
 const norm = s => String(s || 'idle').toLowerCase()
 const statusClass = s => {
   const n = norm(s)
   if (n === 'running') return 'run'
   if (['done', 'complete', 'ok'].includes(n)) return 'ok'
-  if (['error', 'failed', 'blocked'].includes(n)) return 'bad'
+  if (['error', 'failed', 'blocked', 'unavailable'].includes(n)) return 'bad'
   return 'idle'
 }
 const label = s => STATUS_LABEL[norm(s)] || String(s)
@@ -30,7 +30,6 @@ export default function Inspector({
 }) {
   const spec = DESK_BY_ID[desk] || DESKS[0]
   const [open, setOpen] = useState({})
-  const [caseId, setCaseId] = useState('')
   const body = useRef(null)
   useEffect(() => { body.current?.scrollTo(0, 0) }, [section, agent?.id, desk])
   const live = mode === 'live'
@@ -42,25 +41,36 @@ export default function Inspector({
   }, [events])
   const byGroup = useMemo(() => {
     const m = {}
-    for (const [g] of GROUPS) m[g] = agents.filter(a => a.group === g)
+    for (const [g] of GROUPS) m[g] = agents.filter(a => a.group === g && !a.parent_id)
     return m
   }, [agents])
 
+  const children = agents.filter(a => a.parent_id)
+  const team = children.filter(a => a.parent_id === agent?.id)
+  const parent = agents.find(a => a.id === agent?.parent_id)
+  const role = parent ? 'Specialist' : team.length ? 'Lead' : 'Agent'
   const upstream = agents.filter(a => agent?.depends_on?.includes(a.id))
-  const downstream = agents.filter(a => a.depends_on?.includes(agent?.id))
-  const ev = agent ? latest[agent.id] : null
-  const report = record?.swarm_reports?.find(r => r.agent_id === agent?.id)
+  const downstream = agents.filter(a => !a.parent_id && a.depends_on?.includes(agent?.id))
+  const reports = useMemo(()=>Object.fromEntries((record?.swarm_reports || []).map(r=>[r.agent_id,r])),[record])
+  const finding = id => latest[id]?.event === 'end' ? reports[id] || latest[id] : !replaying ? reports[id] : null
+  const status = id => latest[id]?.status || finding(id)?.status
+  const report = agent && finding(agent.id)
   const recent = events.slice(-8).reverse()
   const needsConsent = live && (spec.alwaysConsent || spec.consentFor?.some(k => (inputs[k] || '').trim()))
   const rosterOpen = g => open[g] ?? (agent ? agent.group === g : g === 'identity')
   const missing = live && (!subject.trim() || spec.fields.some(f => f.required && !(inputs[f.key] || '').trim()) || (needsConsent && !consent))
 
   const submit = e => { e.preventDefault(); if (!running && !missing) onRun?.() }
+  const rosterButton = a => (
+    <button type="button" className={agent?.id === a.id ? 'on' : ''} aria-pressed={agent?.id === a.id} onClick={() => onSelect?.(a.id)}>
+      <span>{a.name}</span><span className={`insp-st ${statusClass(status(a.id))}`}>{label(status(a.id))}</span>
+    </button>
+  )
 
   return (
     <aside className="insp" style={{ '--desk': spec.color }} aria-label="Agent inspector">
       <header className="insp-head">
-        <div className="insp-title"><span>{section === 'agents' && agent ? agent.group + ' swarm' : 'Investigation desk'}</span>
+        <div className="insp-title"><span>{section === 'agents' && agent ? role+' · '+agent.group+' swarm' : 'Investigation desk'}</span>
           <b>{section === 'agents' && agent ? agent.name : spec.name + ' investigation'}</b></div>
         <button type="button" className="insp-x" onClick={onClose} aria-label="Close inspector">×</button>
       </header>
@@ -81,34 +91,47 @@ export default function Inspector({
 
         {section === 'agents' && <>
         {agent && <section className="insp-sec">
-          <h3>Assignment</h3><p>{agent.task.replace(/^.*?: /,'')}</p>
+          <h3>Assignment</h3>
+          {agent.persona && <p className="insp-persona">{agent.persona}</p>}
+          {agent.task && <p>{agent.task.replace(/^[^:]+: /,'')}</p>}
           <dl className="insp-facts">
+            {parent && <div><dt>Lead</dt><dd><button className="insp-parent" onClick={()=>onSelect(parent.id)}>{parent.name} ↗</button></dd></div>}
             <div><dt>Receives from</dt><dd>{upstream.map(a=>a.name).join(', ') || 'Case evidence'}</dd></div>
-            <div><dt>Hands off to</dt><dd>{downstream.map(a=>a.name).join(', ') || 'Case ledger'}</dd></div>
-            <div><dt>Status</dt><dd>{label(ev?.status)}</dd></div>
+            <div><dt>Hands off to</dt><dd>{parent?.name || downstream.map(a=>a.name).join(', ') || 'Case ledger'}</dd></div>
+            <div><dt>Status</dt><dd>{label(status(agent.id))}</dd></div>
           </dl>
-          {report && <details className="agent-report"><summary>Read agent report</summary><p>{report.detail}</p>
+          {team.length>0 && <section className="insp-team"><h4>Specialist reports</h4>
+            {team.map(child=><div key={child.id}>
+              <button onClick={()=>onSelect(child.id)}>
+                <strong>{child.name}</strong><small>{label(status(child.id))} ↗</small>
+                {child.persona && <span>{child.persona}</span>}
+              </button>
+              {finding(child.id) && <details><summary>{child.name} finding</summary><p>{finding(child.id).detail}</p></details>}
+            </div>)}
+          </section>}
+          {report && <section className="agent-report"><h4>{role} finding</h4><p>{report.detail}</p>
             {report.assessment && <p>Assessment · {report.assessment.replaceAll('_',' ')}</p>}
-            {report.refs.map(id => {
-              const row = record.evidence.find(e=>e.id===id)
-              return row && <details key={id}><summary>{row.label} · {row.source}</summary><p>{row.detail}</p><small>{row.as_of}</small></details>
-            })}</details>}
+            {report.refs?.map(id => {
+              const row = record?.evidence?.find(e=>e.id===id)
+              return row ? <details key={id}><summary>{row.label} · {row.source}</summary><p>{row.detail}</p><small>{row.as_of}</small></details> : <small className="insp-ref" key={id}>{id}</small>
+            })}</section>}
         </section>}
         <section className="insp-sec">
-          <h3>Swarm roster <span>{agents.length} agents</span></h3>
+          <h3>Swarm roster <span>{children.length ? (agents.length-children.length)+' leads + '+children.length+' specialists' : agents.length+' agents'}</span></h3>
           {GROUPS.map(([g, name, hint]) => (
             <div key={g} className="insp-acc">
               <button type="button" aria-expanded={rosterOpen(g)} onClick={() => setOpen({ ...open, [g]: !rosterOpen(g) })}>
-                <span>{name}<small>{hint}</small></span><em>{byGroup[g].length} agents</em>
+                <span>{name}<small>{hint}</small></span><em>{byGroup[g].length} {children.length?'leads':'agents'}</em>
               </button>
               {rosterOpen(g) && (
                 <ul>
                   {byGroup[g].length === 0 && <li className="insp-empty">No agents in this group</li>}
                   {byGroup[g].map(a => (
                     <li key={a.id}>
-                      <button type="button" className={agent?.id === a.id ? 'on' : ''} aria-pressed={agent?.id === a.id} onClick={() => onSelect?.(a.id)}>
-                        <span>{a.name}</span><span className={`insp-st ${statusClass(latest[a.id]?.status)}`}>{label(latest[a.id]?.status)}</span>
-                      </button>
+                      {rosterButton(a)}
+                      {children.some(c=>c.parent_id===a.id) && <ul className="insp-specialists" aria-label={a.name+' specialists'}>
+                        {children.filter(c=>c.parent_id===a.id).map(c=><li key={c.id}>{rosterButton(c)}</li>)}
+                      </ul>}
                     </li>
                   ))}
                 </ul>
@@ -157,7 +180,7 @@ export default function Inspector({
         <section className="insp-sec trace-toolbar"><h3>Investigation trace</h3>
           {caseOptions.length > 0 && (
             <label className="insp-f"><span>Filed investigation</span>
-              <select disabled={running} value={caseId} onChange={e => { setCaseId(e.target.value); onCase?.(e.target.value) }}>
+              <select disabled={running} value={record?.id || ''} onChange={e => onCase?.(e.target.value)}>
                 <option value="">Select a recorded trace</option>
                 {caseOptions.map(o => <option key={optId(o)} value={optId(o)}>{optName(o)}</option>)}
               </select>

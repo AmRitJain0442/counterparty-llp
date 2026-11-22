@@ -77,5 +77,18 @@
 .insp-act button:hover{border-color:var(--line-2,#4a4536)}
 .insp-who{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:600}
 .insp-d{color:var(--ink-2,#c9c0aa);font-size:12px;overflow-wrap:anywhere}
+.insp-persona {margin:12px 0 6px;padding-left:10px;border-left:2px solid var(--desk);color:var(--ivory);line-height:1.5}
+.insp-parent {border:0;border-bottom:1px solid var(--rule);padding:0;background:none;color:var(--ivory);cursor:pointer}
+.insp-team button {display:grid;grid-template-columns:1fr auto;gap:3px 8px;width:100%;padding:10px 8px;background:#191710;border:0;border-left:1px solid var(--desk);text-align:left;cursor:pointer}
+.insp-team>div+div {margin-top:4px}
+.insp-team details {padding:4px 8px;color:var(--ink-2);overflow-wrap:anywhere}
+.insp-team summary {cursor:pointer}
+.insp-team button small {align-self:center;color:#d0b899}
+.insp-team button span {grid-column:1/-1;color:#afa590;font-size:12px}
+.insp-team button:hover strong,.insp-parent:hover {color:#ff996b}
+.insp-ref {display:inline-block;margin-right:8px}
+.agent-report {overflow-wrap:anywhere}
+.insp .insp-specialists li button {min-height:28px}
+@media(pointer:coarse){.atlas-dock .insp-acc li button {min-height:44px}}
 @media (max-width:520px){.insp{width:100vw}}
 @media (prefers-reduced-motion:no-preference){.insp{animation:insp-in .18s ease-out}@keyframes insp-in{from{transform:translateX(24px);opacity:0}}}
