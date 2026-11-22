@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import sqlite3
 from contextlib import closing, contextmanager
 from datetime import datetime, timezone
@@ -174,3 +175,99 @@ def list_cases() -> list[dict]:
 def get_case(id: str) -> dict | None:
     doc = _ledger().get("cases", _case_key(id))
     return _decision(doc) if doc else None
+
+
+def _watch_key(watch_id):
+    key = str(watch_id)
+    if not re.fullmatch(r"[1-9][0-9]{0,19}", key):
+        raise ValueError("expected a positive Crustdata watch id")
+    return key
+
+
+def bind_watch(watch_id: int | str, case_id: str) -> None:
+    """Bind a dedicated entity watch once. Only the trusted control plane calls this."""
+    watch = _watch_key(watch_id)
+    case = _case_key(case_id)
+
+    def bind(tx):
+        if tx.get("cases", case) is None:
+            raise KeyError("case does not exist")
+        binding = tx.get("watch_bindings", watch)
+        if binding is None:
+            tx.put("watch_bindings", watch, {"case": case})
+        elif binding["case"] != case:
+            raise ValueError("watch already belongs to another case")
+
+    _ledger().atomic(bind)
+
+
+def stage_watch_event(watch_id, notification_id: str, delivered_at: str) -> dict:
+    """Commit a minimal outbox row before trying to publish its ID."""
+    watch = _watch_key(watch_id)
+    event_id = _key(f"crustdata/v1/{watch}/{notification_id}")
+
+    def stage(tx):
+        event = tx.get("watch_events", event_id)
+        if event is not None:
+            return event
+        binding = tx.get("watch_bindings", watch)
+        if binding is None:
+            raise KeyError("unbound watch")
+        event = {
+            "event_id": event_id,
+            "case": binding["case"],
+            "as_of": delivered_at,
+            "state": "pending",
+        }
+        tx.put("watch_events", event_id, event)
+        return event
+
+    return _ledger().atomic(stage)
+
+
+def pending_watch_events(limit: int = 100) -> list[str]:
+    if not 1 <= limit <= 1000:
+        raise ValueError("outbox limit must be 1 to 1000")
+    return [event["event_id"] for event in _ledger().scan("watch_events", pending_limit=limit)]
+
+
+def mark_watch_published(event_id: str) -> None:
+    def mark(tx):
+        event = tx.get("watch_events", event_id)
+        if event is None:
+            raise KeyError("unknown event")
+        # A push may have committed before the publisher's confirmation arrived.
+        if event["state"] == "pending":
+            tx.put("watch_events", event_id, {**event, "state": "published"})
+
+    _ledger().atomic(mark)
+
+
+def reopen_from_watch(event_id: str) -> bool:
+    """Apply a staged event at most once, even after a lost publish or push ACK."""
+    def apply(tx):
+        event = tx.get("watch_events", event_id)
+        if event is None:
+            raise KeyError("unknown event")
+        if event["state"] == "applied":
+            return False
+        doc = tx.get("cases", event["case"])
+        if doc is None:
+            raise KeyError("bound case is missing")
+        previous = doc.get("watch_review", {})
+        # Deliveries may arrive out of order. Times are normalized UTC strings.
+        latest_date, latest_id = max(
+            (previous.get("as_of", ""), previous.get("event_id", "")),
+            (event["as_of"], event_id),
+        )
+        doc["watch_review"] = {
+            "status": "REOPENED",
+            "event_count": previous.get("event_count", 0) + 1,
+            "as_of": latest_date,
+            "event_id": latest_id,
+        }
+        tx.put("cases", event["case"], doc)
+        tx.put("watch_events", event_id, {**event, "state": "applied"})
+        return True
+
+    return _ledger().atomic(apply)
