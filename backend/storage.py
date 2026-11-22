@@ -188,12 +188,12 @@ def list_cases() -> list[dict]:
     # Stable tie-break even across replicas with identical creation timestamps.
     cases = [(doc["created_at"], _decision(doc)) for doc in docs]
     cases.sort(key=lambda item: (item[0], item[1]["id"]), reverse=True)
-    return [case for _, case in cases]
+    return [case for _, case in cases if case.get("mode") == "live"]
 
 
 def get_case(id: str) -> dict | None:
     doc = _ledger().get("cases", _case_key(id))
-    return _decision(doc) if doc else None
+    return _decision(doc) if doc and _decision(doc).get("mode") == "live" else None
 
 
 def attach_receipt(case: dict, receipt: dict) -> None:
@@ -401,7 +401,8 @@ def append_review(case_id, review):
     key = _case_key(case_id)
 
     def write(tx):
-        if tx.get("cases", key) is None:
+        case = tx.get("cases", key)
+        if case is None or _decision(case).get("mode") != "live":
             raise KeyError("case not found")
         doc = tx.get("human_reviews", key) or {"items": []}
         items = doc["items"]
@@ -414,5 +415,7 @@ def append_review(case_id, review):
 
 
 def reviews_for(case_id):
+    if get_case(case_id) is None:
+        return []
     doc = _ledger().get("human_reviews", _case_key(case_id))
     return doc["items"] if doc else []

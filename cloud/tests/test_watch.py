@@ -47,9 +47,9 @@ class WatchTests(unittest.TestCase):
         self.addCleanup(env.stop)
         self.client = TestClient(watch.app)
         self.addCleanup(self.client.close)
-        self.case = {"id": "first/1", "verdict": "HELD", "flow": [[1, 2]]}
+        self.case = {"mode": "live", "id": "first/1", "verdict": "HELD", "flow": [[1, 2]]}
         storage.save_case(self.case)
-        storage.save_case({"id": "second"})
+        storage.save_case({"mode": "live", "id": "second"})
         storage.bind_watch(17, self.case["id"])
         self.body = {
             "metadata": {"kind": "entity", "dataset": "company", "watch_id": 17,

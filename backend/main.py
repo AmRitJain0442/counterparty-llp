@@ -14,7 +14,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .account import capabilities
 from .adjudication import adjudicate
-from .demo import build_demo
 from .swarm import agents_for, run_council
 from .receipts import ReceiptError, create_receipt, verify_receipt
 from .watch import router as watch_router
@@ -31,7 +30,7 @@ WEB = Path(__file__).resolve().parents[1] / "web" / "dist"
 class Intake(BaseModel):
     model_config = ConfigDict(extra="forbid")
     desk: Literal["payment", "candidate", "estate", "company"]
-    mode: Literal["demo", "live"]
+    mode: Literal["live"] = "live"
     subject: str = Field(default="", max_length=180)
     consent: bool = False
     inputs: dict[str, str] = Field(default_factory=dict, max_length=14)
@@ -63,12 +62,6 @@ async def same_origin(request: Request, call_next):
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
-
-
-@app.get("/api/exhibits/older-estate")
-def historical_estate():
-    file = Path(__file__).parent / "exhibits" / "older-estate.json"
-    return json.loads(file.read_text(encoding="utf-8"))
 
 
 @app.get("/api/watch")
@@ -142,9 +135,6 @@ def investigate(intake: Intake):
     if intake.mode == "live":
         with progress.record_collection() as collections:
             raw = collect_live(intake.desk, subject, intake.consent, intake.inputs)
-    else:
-        raw = build_demo(intake.desk)
-        collections = []
     progress.report("Opposing counsel", "running", "Checking evidence and alternative explanations")
     ruling = adjudicate(intake.desk, raw)
     case = {

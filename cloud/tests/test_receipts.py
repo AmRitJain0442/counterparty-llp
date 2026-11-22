@@ -55,7 +55,7 @@ class ReceiptTests(unittest.TestCase):
                 signer.assert_called_once()
 
     def test_compare_snapshot_when_attaching(self):
-        case = {"id": "sample", "verdict": "SIGNED"}
+        case = {"mode": "live", "id": "sample", "verdict": "SIGNED"}
         receipt = receipts.create_receipt(case)
         case.update(receipt=receipt["digest"], receipt_record=receipt)
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, LEDGER_BACKEND="sqlite",

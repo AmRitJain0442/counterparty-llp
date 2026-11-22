@@ -9,23 +9,20 @@ from backend import main
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
+    from backend.demo import build_demo
+    from backend import swarm
+    monkeypatch.setattr(main, "collect_live", lambda desk, *args: build_demo(desk))
+    monkeypatch.setattr(swarm, "draft_note", lambda *args, **kwargs: ({"note": "Offline review", "assessment": "ready", "refs": []}, "complete"))
     monkeypatch.setenv("SQLITE_PATH", str(tmp_path / "ledger.sqlite3"))
     monkeypatch.setenv("LEDGER_BACKEND", "sqlite")
     return TestClient(main.app)
 
 
-@pytest.mark.parametrize("desk", ["payment", "candidate", "estate", "company"])
-def test_demo_filed_and_retrievable(client, desk):
-    response = client.post("/api/cases", json={"mode": "demo", "desk": desk})
-    assert response.status_code == 201, response.text
-    case = response.json()
-    assert case["mode"] == "demo"
-    assert case["evidence"] and case["verdict"] and case["receipt"]
-    roster = client.get(f"/api/swarms/{desk}").json()["agents"]
-    assert case["swarm_roster"] == roster
-    assert {a["id"] for a in roster} == {r["agent_id"] for r in case["swarm_reports"]}
-    assert client.get("/api/cases/" + case["id"]).json() == case
-    assert client.get("/api/cases").json() == [case]
+@pytest.mark.parametrize("mode", ["demo", "replay", "synthetic"])
+@pytest.mark.parametrize("route", ["/api/cases", "/api/cases/stream"])
+def test_obsolete_mode_rejected_before_collection(client, monkeypatch, mode, route):
+    monkeypatch.setattr(main, "collect_live", lambda *args: pytest.fail("provider invoked"))
+    assert client.post(route, json={"desk": "estate", "mode": mode}).status_code == 422
 
 
 def test_live_candidate_requires_consent_before_any_external_request(client, monkeypatch):
@@ -36,7 +33,7 @@ def test_live_candidate_requires_consent_before_any_external_request(client, mon
 
 
 def test_stream_completes_with_persisted_case(client):
-    response = client.post("/api/cases/stream", json={"desk": "estate", "mode": "demo"})
+    response = client.post("/api/cases/stream", json={"desk": "estate", "subject": "Example"})
     events = [json.loads(line) for line in response.text.splitlines()]
     assert any(e["type"] == "step" for e in events)
     assert events[-1]["type"] == "case"
@@ -54,14 +51,14 @@ def test_browser_input_cannot_select_provider_calls(client):
 
 def test_parallel_creation_keeps_both_receipts(client):
     def create(_):
-        return client.post("/api/cases", json={"desk": "estate", "mode": "demo"}).json()
+        return client.post("/api/cases", json={"desk": "estate", "subject": "Example"}).json()
     with ThreadPoolExecutor(max_workers=2) as workers:
         cases = list(workers.map(create, range(2)))
     assert len({case["id"] for case in cases}) == 2
     assert {case["id"] for case in client.get("/api/cases").json()} == {case["id"] for case in cases}
 
 def test_review_keeps_original_commitment_valid(client):
-    case = client.post("/api/cases", json={"desk": "payment", "mode": "demo"}).json()
+    case = client.post("/api/cases", json={"desk": "payment", "subject": "Example"}).json()
     url = "/api/cases/" + case["id"]
     entry = {"disposition": "Callback requested", "note": "Reviewer requested a call using the number on file."}
     response = client.post(url + "/reviews", json=entry)
@@ -111,3 +108,14 @@ def test_specialist_concern_reaches_the_filed_decision(client, monkeypatch):
     assert decision["specialist_referrals"] == [specialist["id"]]
     assert "Identity resolver" in decision["referred_by"]
     assert client.get("/api/cases/" + case["id"] + "/receipt").json()["digest"] == case["receipt"]
+
+
+def test_old_cases_hidden_without_deleting_records(client):
+    from backend import storage
+    storage.save_case({"id": "old", "mode": "demo"})
+    assert client.get("/api/cases").json() == []
+    for suffix in ("", "/receipt", "/reviews"):
+        assert client.get("/api/cases/old" + suffix).status_code == 404
+    assert client.post("/api/cases/old/reviews", json={"disposition": "Review complete", "note": "Done"}).status_code == 404
+    assert storage._ledger().get("cases", storage._case_key("old")) is not None
+    assert client.get("/api/exhibits/older-estate").status_code == 404
