@@ -52,7 +52,10 @@ def test_live_parallel_fanout_and_context(monkeypatch):
 def test_live_missing_vertex_is_honest(monkeypatch):
     monkeypatch.setattr(swarm, 'draft_note', lambda *a, **kw: (None, 'unconfigured'))
     reports = {r['agent_id']: r for r in swarm.run_council('payment', ROWS, 'HELD', lambda e: None, 'live')}
-    assert reports['analyst_scope']['status'] == 'unavailable'
+    children = [r for r in reports.values() if r['parent_id']]
+    assert len(children) == 24
+    assert all(r['status'] == 'unavailable' and not r['refs'] for r in children)
+    assert reports['analyst_scope']['status'] == 'blocked'
     assert reports['partner']['status'] == 'blocked'
     assert reports['authority']['status'] == 'complete'
 

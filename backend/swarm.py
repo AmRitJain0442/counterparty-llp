@@ -78,7 +78,8 @@ def run_council(desk, evidence, verdict, emit, mode):
         refs = list(dict.fromkeys(r['id'] for r in selected))
         status = 'complete'
         assessment = None
-        if key.startswith(('analyst_', 'challenger_')) or key == 'partner':
+        synthesizes = key.startswith(('analyst_', 'challenger_')) or key == 'partner'
+        if synthesizes:
             upstream = [reports[d] for d in deps] + [reports[c] for c in agent["specialist_ids"]]
             if any(r['status'] != 'complete' for r in upstream):
                 detail, status = 'Required council output unavailable; review blocked.', 'blocked'
@@ -119,12 +120,14 @@ def run_council(desk, evidence, verdict, emit, mode):
             detail = f'{agent["task"]}: {len(selected)} observations; sources: ' + ', '.join(
                 dict.fromkeys(str(r.get('source', 'unknown')) for r in selected))
         children = [reports[c] for c in agent['specialist_ids']]
-        if children:
-            detail += ' Specialist observations: ' + '; '.join(
-                f"{c['name']} [{c['status']}, {c.get('assessment')}]: {c['detail']}" for c in children)
+        if not synthesizes or replay:
+            detail += ' Specialist observations: ' + ' '.join(
+                f"{child['name']}: {child['detail']}" for child in children)
             refs = list(dict.fromkeys(refs + [ref for c in children for ref in c['refs']]))
-            if any(c['status'] != 'complete' or c.get('assessment') == 'needs_evidence' for c in children):
-                assessment = 'needs_evidence'
+        if status != 'complete':
+            refs = []
+        if any(c['status'] != 'complete' or c.get('assessment') == 'needs_evidence' for c in children):
+            assessment = 'needs_evidence'
         return dict(agent_id=key, name=agent['name'], group=agent['group'], status=status,
                     detail=detail, refs=refs, assessment=assessment, depends_on=list(deps),
                     persona=agent['persona'], parent_id=None, specialist_ids=agent['specialist_ids'])
