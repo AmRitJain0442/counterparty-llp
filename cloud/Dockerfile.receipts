@@ -1,0 +1,5 @@
+ARG COUNTERPARTY_IMAGE
+ARG COSIGN_IMAGE=ghcr.io/sigstore/cosign/cosign:v3.1.4
+FROM ${COSIGN_IMAGE} AS cosign
+FROM ${COUNTERPARTY_IMAGE}
+COPY --from=cosign /ko-app/cosign /usr/local/bin/cosign
