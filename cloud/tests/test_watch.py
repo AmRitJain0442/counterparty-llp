@@ -33,14 +33,14 @@ class WatchTests(unittest.TestCase):
         settings = {
             "LEDGER_BACKEND": "sqlite", "SQLITE_PATH": str(Path(tmp.name) / "ledger.sqlite"),
             "WATCH_TRANSPORT": "local", "WATCH_WEBHOOK_SECRET": "test-signing-key",
-            "PUBSUB_TOPIC": "projects/demo-infra/topics/watch",
-            "PUBSUB_SUBSCRIPTION": "projects/demo-infra/subscriptions/watch-push",
-            "PUBSUB_PUSH_SERVICE_ACCOUNT": "push@demo-infra.iam.gserviceaccount.com",
+            "PUBSUB_TOPIC": "projects/test-infra/topics/watch",
+            "PUBSUB_SUBSCRIPTION": "projects/test-infra/subscriptions/watch-push",
+            "PUBSUB_PUSH_SERVICE_ACCOUNT": "push@test-infra.iam.gserviceaccount.com",
             "PUBSUB_PUSH_AUDIENCE": "https://watch.example.test/watch/pubsub",
         }
         if os.getenv("COUNTERPARTY_TEST_FIRESTORE") == "1":
             self.assertRegex(os.environ["FIRESTORE_EMULATOR_HOST"], r"^(localhost|127\.0\.0\.1):[0-9]+$")
-            settings.update(LEDGER_BACKEND="firestore", GOOGLE_CLOUD_PROJECT="demo-" + uuid4().hex[:12],
+            settings.update(LEDGER_BACKEND="firestore", GOOGLE_CLOUD_PROJECT="test-" + uuid4().hex[:12],
                             FIRESTORE_DATABASE="(default)")
         env = patch.dict(os.environ, settings)
         env.start()
@@ -140,7 +140,7 @@ class WatchTests(unittest.TestCase):
             for change, code in [({"aud": "other"}, 401), ({"iss": "other"}, 401),
                                  ({"email": "other"}, 403), ({"email_verified": False}, 403)]:
                 self.assertEqual(self.client.post(push, json=envelope, headers=headers(**change)).status_code, code)
-            other = {**envelope, "subscription": "projects/demo-infra/subscriptions/other"}
+            other = {**envelope, "subscription": "projects/test-infra/subscriptions/other"}
             self.assertEqual(self.client.post(push, json=other, headers=headers()).status_code, 403)
             for _ in range(2):
                 self.assertEqual(self.client.post(push, json=envelope, headers=headers()).status_code, 204)

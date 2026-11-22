@@ -23,7 +23,7 @@ class BatchCacheTests(unittest.TestCase):
 
     def test_cloud_queries_keep_values_in_parameters(self):
         client = Mock()
-        table = "demo-infra.counterparty.batch_cache"
+        table = "test-infra.counterparty.batch_cache"
         with patch.dict(os.environ, BIGQUERY_CACHE_TABLE=table), patch.object(storage, "_bigquery", return_value=client):
             storage.put_cached_batch("private-scope", {"person": "private-value"}, as_of="2025-04-02", ttl_seconds=60)
             sql = client.query.call_args.args[0]
