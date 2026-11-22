@@ -20,13 +20,17 @@ Pop-Location
 
 Open **http://127.0.0.1:8080**. On macOS or Linux use `python3.12 -m venv .venv`, install the requirements with `.venv/bin/pip`, build the web app as above, and run `.venv/bin/python -m uvicorn backend.main:app --port 8080`. The production bundle and API share one origin.
 
-**Demo** runs the four curated cases locally, with source labels and dates. **Live** spends credits on the configured Crustdata account and runs two Gemini analysts, two challengers and a review partner through Vertex AI. Each completed run creates a ledger entry. SQLite defaults to `.local/ledger.sqlite3`.
+**Demo** runs a curated case locally with source labels and dates. **Live** uses the configured Crustdata account for collection and Gemini on Vertex AI for analysis. Each completed run creates a ledger entry. SQLite defaults to `.local/ledger.sqlite3`.
 
 ## Swarm map
 
 The first screen combines a radial workflow and an inspector. Drag to pan, use the wheel or pinch to zoom, and click the zoom percentage to fit the map. Select a node to focus its handoffs or use **Find** to locate an agent. On reload the rings, sectors and connections draw in sequence. Reduced-motion mode opens directly on the settled map. The inspector opens beside the map on desktop and as a bottom sheet on phones. **Run** opens the current desk’s intake. **Trace** replays a filed investigation without calling providers.
 
-Twelve workers handle each case. Seven do deterministic work such as indexing sources, checking dates and applying evidence rules. Five live Gemini reviewers run in three stages. Both analysts see the dated source cards. Both challengers receive both analyses, and the review partner receives both challenges. Each reviewer returns an assessment and source references. Missing reviews or requests for material evidence refer a proposed adverse finding or forecast to a human. A completed run seals the reports and their dependency events into the case receipt. Demo runs use curated evidence and local review logic.
+Each investigation has four swarms, 12 leads and 24 specialists. Every lead assigns two specialists different questions about the same case and receives both reports before filing its own. Select a lead or specialist on the map to inspect its persona, assignment, handoffs and filed findings. The discussion room groups specialist reports and source cards under the lead who commissioned them.
+
+In live mode, each specialist runs a separate Gemini review. Five leads use Gemini to synthesize findings, and seven use deterministic checks for tasks such as indexing sources and preserving the evidence rules. A fully executed live investigation runs 29 model reviews on Vertex AI. Analysts pass their findings to the challengers, who pass theirs to the review partner. A specialist can flag missing evidence for human review even when a lead would otherwise accept the proposed finding. The additional opinions all refer back to the underlying source cards.
+
+Demo specialists run their checks locally. A new case receipt covers the team's personas and assignments, reports and execution order. Reopening an older case shows the team originally recorded for that case.
 
 ## Credentials
 
@@ -47,7 +51,7 @@ The Windows launcher also reads the current user's DPAPI-protected Crustdata tok
 |---|---|
 | POST /api/cases | File a demo or live investigation |
 | POST /api/cases/stream | Same investigation with newline-delimited progress and a final case |
-| GET /api/swarms/{desk} | Twelve named workers, their assignments and their dependencies |
+| GET /api/swarms/{desk} | Twelve leads and their 24 specialists, including personas, assignments, ownership and dependencies |
 | GET /api/cases | Ledger in reverse creation order |
 | GET /api/cases/{id} | Stored evidence, decision, cost and receipt |
 | GET /api/capabilities | Current account balance, prices and entitlements |
