@@ -2,6 +2,8 @@
 
 An evidence room for checking a payment request, an employment claim, a bankrupt estate or a listed company. Each desk collects dated observations, tests an alternative explanation and files a reviewable decision.
 
+The public deployment runs on Google Cloud Run in Mumbai. Anyone can open an investigation and read filed cases in its shared Firestore ledger. Demo runs use zero provider credits. Live investigations use the project's Crustdata account and Gemini on Vertex AI. [Open Counterparty](https://counterparty-939419364980.asia-south1.run.app)
+
 ## Run locally
 
 Use Python 3.12 and Node.js 22 or newer. From the repository root on Windows:
@@ -53,7 +55,7 @@ The Windows launcher also reads the current user's DPAPI-protected Crustdata tok
 | GET /api/health | Service health |
 | GET /docs | Interactive API schema |
 
-Keep private ingress on hosted deployments. Everyone with application access shares one firm's ledger. The demo supports a synthetic candidate. A real candidate check requires consent and identifiers appropriate to the inquiry.
+Everyone with application access shares its ledger. The demo supports a synthetic candidate. A real candidate check requires consent and identifiers appropriate to the inquiry.
 
 ## External API inventory
 
