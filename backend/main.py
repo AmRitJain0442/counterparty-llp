@@ -36,7 +36,7 @@ class Intake(BaseModel):
     @field_validator("inputs")
     @classmethod
     def validate_inputs(cls, inputs):
-        allowed = {"domain", "person_url", "ifsc", "orgnr", "cik", "claim", "lei"}
+        allowed = {"domain", "sender_domain", "person_url", "ifsc", "orgnr", "cik", "claim", "lei"}
         if inputs.keys() - allowed:
             raise ValueError("Unrecognized desk input")
         if any(len(v) > (2000 if k == "claim" else 300) for k, v in inputs.items()):

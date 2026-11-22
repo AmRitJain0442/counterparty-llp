@@ -1,5 +1,6 @@
 """Public browser boundary. Raw provider records never leave this module."""
-import os
+from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 import re
 from .providers import run_live
 
@@ -7,7 +8,7 @@ from .providers import run_live
 def collect_live(desk, subject, consent=False, inputs=None):
     supplied = inputs if isinstance(inputs, dict) else {}
     safe = {k: str(supplied[k])[:500] for k in
-            ('domain', 'person_url', 'ifsc', 'orgnr', 'cik', 'claim') if k in supplied}
+            ('domain', 'sender_domain', 'person_url', 'ifsc', 'orgnr', 'cik', 'claim', 'lei') if k in supplied}
     calls = {}
     person = safe.get('person_url', '')
     if person and consent is True and re.fullmatch(r'https://(?:www\.)?linkedin\.com/in/[A-Za-z0-9_%\-]+/?', person):
@@ -17,11 +18,23 @@ def collect_live(desk, subject, consent=False, inputs=None):
     if domain:
         safe['domain'] = domain
     calls['company_identify'] = {'domains': [domain], 'exact_match': True} if domain else {'names': [str(subject)[:200]]}
-    raw = run_live(desk, subject, consent, {**safe, 'crustdata': calls})
+    # The identity, person, and public registry desks can collect independently.
+    lanes = [{"crustdata": {operation: payload}} for operation, payload in calls.items()]
+    lanes.extend({field: safe[field]} for field in ("orgnr", "cik", "ifsc", "lei") if safe.get(field))
+    if desk == "payment" and (safe.get("sender_domain") or domain):
+        lanes.append({"domain": safe.get("sender_domain") or domain})
+    raw = dict(evidence=[], steps=[], credits=[], flows=[], signals=[])
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(copy_context().run, run_live, desk, "", consent, lane)
+                   for lane in lanes]
+        for future in futures:
+            part = future.result()
+            for key in raw:
+                raw[key].extend(part[key])
     # Enrich only a unique confident identity; tied name matches remain unresolved.
     identified = next((e['data'] for e in raw['evidence'] if e['operation'] == 'company_identify'), None)
     matches = identified[0].get('matches', []) if isinstance(identified, list) and len(identified) == 1 else []
-    matches = [m for m in matches if isinstance(m, dict) and isinstance(m.get('confidence_score'), (int, float)) and m['confidence_score'] >= .95]
+    matches = [m for m in matches if isinstance(m, dict) and isinstance(m.get('confidence_score'), (int, float)) and m['confidence_score'] >= .8]
     if len(matches) == 1:
         company = matches[0].get('company_data', {})
         cid = company.get('crustdata_company_id') or company.get('basic_info', {}).get('crustdata_company_id')
