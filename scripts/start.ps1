@@ -7,6 +7,10 @@ if (!$env:CRUSTDATA_API_KEY -and (Test-Path $stored)) {
     $encrypted = Get-Content -LiteralPath $stored | ConvertTo-SecureString
     $env:CRUSTDATA_API_KEY = [System.Net.NetworkCredential]::new('', $encrypted).Password
 }
+$watch = Join-Path $cfg 'watch-id'
+if (!$env:CRUSTDATA_WATCH_ID -and (Test-Path $watch)) {
+    $env:CRUSTDATA_WATCH_ID = (Get-Content -LiteralPath $watch -Raw).Trim()
+}
 $pointer = Join-Path $cfg 'adc-path'
 if (!$env:GOOGLE_APPLICATION_CREDENTIALS -and (Test-Path $pointer)) {
     $env:GOOGLE_APPLICATION_CREDENTIALS = (Get-Content -LiteralPath $pointer -Raw).Trim()

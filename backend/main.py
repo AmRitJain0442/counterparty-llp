@@ -17,6 +17,7 @@ from .demo import build_demo
 from .drafting import draft_note
 from .receipts import ReceiptError, create_receipt, verify_receipt
 from .watch import router as watch_router
+from .watch_history import watch_history
 from . import progress
 from .live import collect_live
 from .storage import get_case, list_cases, save_case
@@ -61,6 +62,11 @@ async def same_origin(request: Request, call_next):
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/watch")
+def company_watch():
+    return watch_history()
 
 
 @app.get("/api/capabilities")

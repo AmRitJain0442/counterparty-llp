@@ -1,4 +1,4 @@
-﻿# Account and data rehearsal
+# Account and data rehearsal
 
 On 22 November 2026 the supplied Crustdata key returned HTTP 200 from both account endpoints, 15,200 starting credits, 100 total requests per minute and 5 per minute on the enabled identity, enrichment, person search and job search routes. Batch person verification was disabled. The account price card omitted entity watch endpoints. No subscription was upgraded. No real person was submitted for candidate verification.
 
@@ -13,3 +13,8 @@ The supplied Google service account completed a Gemini 2.5 Flash generation on V
 | Isfjord Norway AS | Name match 1.0. Registry 981647459 returned bankrupt and 247 employees. | Available as a second estate subject. |
 
 Historical snapshot retention is unconfirmed. The demo uses labeled reconstructions. Watch evidence in the stage example is a replay. A real callback needs an entitled watch and a reachable authenticated receiver. Re-run the account preflight with `python -m scripts.preflight` after a plan change.
+
+
+The watch index accepted the supplied key even though the account price card omitted watch routes. Created Ruta company watch 57486 for a headcount change, with a weekly trigger, 30-day data refresh and expiry on 2027-01-21. Its baseline run 615752 succeeded on 2026-11-22 at zero credits. It is configured for pull-based history. No notification destination was registered. Set CRUSTDATA_WATCH_ID to show its real counters at /api/watch.
+
+A subsequent full live Ruta run cost 40.38 credits across identity, enrichment and four search pages. It reviewed 166 relevant profiles and found no destination group meeting the publication threshold. The earlier 15-profile query and the estate workflow use different filters. Budget from the measured total when rehearsing a full live estate.
