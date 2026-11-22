@@ -3,11 +3,11 @@ import Logo from './components/Logo'
 import SwarmAtlas from './swarm/SwarmAtlas'
 import DeskStudio from './components/DeskStudio'
 import CaseFile from './components/CaseFile'
-import Sankey, { SPECIMEN_FLOWS } from './components/Sankey'
+import Sankey from './components/Sankey'
 import Ledger from './components/Ledger'
 import { DESK_BY_ID, REVIEW_STAGES } from './desks'
 import { getCase, listCases } from './api'
-import { formatDate } from './format'
+import { formatDate, isLive } from './format'
 import './app.css'
 
 const RULES = [
@@ -15,14 +15,14 @@ const RULES = [
   ['Movement is evidence, a stale profile is context', 'An exit is dated by the start date at the next employer. People who never update a profile stay in the unknown group.'],
   ['Aggregates, not people', 'Counts and timelines only, in groups of five or more. Individuals are named only with consent or as statutory officers. Dates of birth are never shown.'],
   ['Requests for explanation', 'No automated legal effect. An adverse result holds the payment or the file and sends a human to call back.'],
-  ['Everything is labelled', 'Every row carries an as-of date. Cached data says CACHED and replayed watcher events say REPLAY.'],
+  ['Everything is labelled', 'Every row carries an as-of date. Cached data says CACHED and stored replays say STORED REPLAY. New cases are always collected live.'],
 ]
 
 const WORKSPACE = [
-  ['flow', 'Discussion room', 'Follow a filed case from identity to partner review, desk by desk.'],
-  ['live', 'Live investigation', 'Stream each collection step as the providers report back.'],
-  ['providers', 'Provider room', 'Watch history and the account’s endpoint price card.'],
-  ['archive', 'Estate archive', 'Browse dated estate records the desks have filed.'],
+  ['flow', 'Discussion room', 'Read a filed case from identity to partner review, desk by desk.'],
+  ['live', 'Live investigation', 'Open a live case and watch each collection step as providers report back.'],
+  ['providers', 'Provider room', 'Read the company watch history and the account’s endpoint price card on request.'],
+  ['archive', 'Filed estates', 'Reopen the live estate cases the Estate desk has filed.'],
 ]
 
 export default function App() {
@@ -79,8 +79,8 @@ export default function App() {
 
   // The Sankey follows the open case, then the newest filed case that recorded flows.
   const flowCase = useMemo(() => {
-    if (record?.flows?.length) return record
-    return [...cases].filter(c => c.flows?.length)
+    if (record?.flows?.length && isLive(record)) return record
+    return [...cases].filter(c => c.flows?.length && isLive(c))
       .sort((a, b) => String(b.created_at || b.as_of).localeCompare(String(a.created_at || a.as_of)))[0] || null
   }, [record, cases])
   const flowDesk = flowCase ? DESK_BY_ID[flowCase.desk] : DESK_BY_ID.estate
@@ -111,8 +111,8 @@ export default function App() {
           <div className="wrap">
             <div className="section-head">
               <span className="label hot">The desks</span>
-              <h2>Pick a desk. Run the seeded case, or open a live one.</h2>
-              <p>Demo cases need no input. Live cases ask for the fields each desk reads and show which witnesses they will touch before you send anything.</p>
+              <h2>Pick a desk and open a live case.</h2>
+              <p>Each desk asks for the fields it reads and shows which witnesses it will touch before you send anything. Every case runs against live providers and spends metered credits.</p>
             </div>
             <DeskStudio deskId={deskId} onDeskChange={setDeskId} onFiled={onFiled} />
             <div className="case-slot">
@@ -128,15 +128,14 @@ export default function App() {
               <h2>{flowCase?.desk === 'estate' ? 'Where an estate’s people went.' : 'How the evidence moved.'}</h2>
               <p>
                 {flowCase
-                  ? <>From the {flowDesk?.name.toLowerCase()} case <b>{flowCase.subject || 'seeded demonstration'}</b>, filed {formatDate(flowCase.created_at || flowCase.as_of)}. Ribbon width follows the count{flowCase.desk === 'estate' ? '; groups under five are not shown as numbers' : ''}.</>
-                  : 'No filed case has recorded flows yet. The layout below is a specimen with invented numbers, so you can see what a filed estate looks like. Run the Estate desk to replace it.'}
+                  ? <>From the {flowDesk?.name.toLowerCase()} case <b>{flowCase.subject || 'untitled case'}</b>, filed {formatDate(flowCase.created_at || flowCase.as_of)}. Ribbon width follows the count{flowCase.desk === 'estate' ? '; groups under five are not shown as numbers' : ''}.</>
+                  : 'No live case has recorded flows yet. Open a live Estate case above and its staff flows will appear here.'}
               </p>
             </div>
             {flowCase
               ? <Sankey flows={flowCase.flows} color={flowDesk?.color} unit={flowCase.desk === 'estate' ? 'people' : 'signals'} maskSmall={flowCase.desk === 'estate'}
-                  label={`Flows for ${flowCase.subject || 'the seeded case'}`} />
-              : <div className="specimen"><span className="pill tone-neutral">Specimen · invented numbers</span>
-                  <Sankey flows={SPECIMEN_FLOWS} color={DESK_BY_ID.estate.color} label="Specimen layout of an estate’s staff flows" /></div>}
+                  label={`Flows for ${flowCase.subject || 'the filed case'}`} />
+              : null}
           </div>
         </section>
 

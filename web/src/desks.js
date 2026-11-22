@@ -47,7 +47,6 @@ export const DESKS = [
       { id: 'enrich', label: 'Crustdata person enrich', note: 'Dated roles at the employer', from: ['person_url'] },
       { id: 'search', label: 'Crustdata person search', note: 'Colleagues with overlapping dates', from: ['person_url', 'domain'] },
       { id: 'company', label: 'Crustdata company enrich', note: 'Headcount in the claimed quarter', from: ['domain'] },
-      { id: 'verify', label: 'Crustdata batch verify', note: 'Batch verification disabled on this account', from: ['person_url', 'claim'] },
     ],
   },
   {
@@ -87,9 +86,9 @@ export const DESKS = [
       { key: 'claim', label: 'Question to investigate', placeholder: 'Is the finance team turning over?', long: true },
     ],
     sources: [
-      { id: 'edgar', label: 'EDGAR 8-K 5.02 · 4.01', note: 'Officer and auditor changes', from: ['cik'] },
+      { id: 'edgar', label: 'SEC EDGAR submissions', note: 'Recent filings by form and date', from: ['cik'] },
       { id: 'company', label: 'Crustdata company enrich', note: 'CXO tenure and finance moves', from: ['domain'] },
-      { id: 'watch', label: 'Watcher replay', note: 'When profiles moved vs. filings', from: ['domain', 'cik'] },
+      { id: 'jobs', label: 'Crustdata job search', note: 'Most recent dated hiring signal', from: ['domain'] },
       { id: 'gleif', label: 'GLEIF', note: 'Legal entity and parents', from: ['domain'] },
     ],
   },
@@ -103,5 +102,5 @@ export const REVIEW_STAGES = [
   ['Two witnesses', 'Crustdata plus one public record'],
   ['Opposing counsel', 'Try to kill the finding'],
   ['Partner', 'Sign only two-witness findings'],
-  ['Ledger', 'Hash the receipt to Rekor'],
+  ['Ledger', 'Hash the receipt and file the case'],
 ]

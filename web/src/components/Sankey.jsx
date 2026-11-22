@@ -1,21 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import './sankey.css'
 
-/** Shape-only illustration shown until a filed case supplies real flows. Never presented as data. */
-export const SPECIMEN_FLOWS = [
-  { from: 'Failed firm', to: 'Site operations', count: 60 },
-  { from: 'Failed firm', to: 'Engineering', count: 45 },
-  { from: 'Failed firm', to: 'Office and finance', count: 34 },
-  { from: 'Site operations', to: 'New employer', count: 31 },
-  { from: 'Site operations', to: 'Still lists firm', count: 17 },
-  { from: 'Site operations', to: 'Unknown', count: 12 },
-  { from: 'Engineering', to: 'New employer', count: 28 },
-  { from: 'Engineering', to: 'Still lists firm', count: 9 },
-  { from: 'Engineering', to: 'Unknown', count: 8 },
-  { from: 'Office and finance', to: 'New employer', count: 14 },
-  { from: 'Office and finance', to: 'Unknown', count: 20 },
-]
-
 const W = 940, PAD_Y = 12, NODE_W = 14, GAP = 12, LABEL_W = 190
 
 /** Longest-path layering with a bound so a cyclic feed cannot hang the render. */
