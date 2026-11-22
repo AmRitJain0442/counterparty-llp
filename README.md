@@ -4,7 +4,7 @@
 
 **[Open the workspace](https://counterparty-939419364980.asia-south1.run.app/)** · **[Replay a completed investigation](https://counterparty-939419364980.asia-south1.run.app/?case=c4b983b065f7413daaf908c9ab06f9a6#swarm)** · [Run locally](#run-locally)
 
-| [System architecture](docs/system-architecture.md) | [User flow](docs/user-flow.md) |
+| [System architecture](#system-architecture) | [User flow](#user-flow) |
 | --- | --- |
 | Trace an investigation through FastAPI, Crustdata, Vertex AI and Firestore. | Follow a reviewer from desk intake through the live trace, case file and human review. |
 
@@ -13,6 +13,57 @@
 The replay opens a real company investigation without spending provider credits. Select **Scope analyst** on the map to see what its two specialists checked and which evidence they cited.
 
 [![The Company desk with the Scope analyst selected. The inspector lists its assignment, handoffs and two completed specialist reports.](docs/brand/swarm-inspector.png)](https://counterparty-939419364980.asia-south1.run.app/?case=c4b983b065f7413daaf908c9ab06f9a6#swarm)
+
+## System architecture
+
+![The React workspace sends an investigation to FastAPI on Cloud Run. Crustdata and public records feed the evidence collector, Gemini supports the agent council, and Firestore stores the filed case and receipt.](docs/diagrams/system-architecture.png)
+
+<details>
+<summary>Explore the system architecture in Mermaid</summary>
+
+```mermaid
+flowchart TD
+    browser["React workspace"] -->|"POST /api/cases/stream"| intake
+    subgraph service["FastAPI on Cloud Run"]
+        intake["Validate desk, subject and consent"] --> collect["Collect dated evidence"]
+        collect --> rules["Apply desk rules to propose a finding"]
+        rules --> council["12 leads and 24 specialists review the finding"]
+        council --> seal["Resolve referrals and create the receipt"]
+    end
+    collect <-->|"Company, person and job APIs"| crust["Crustdata"]
+    collect <-->|"When identifiers are available"| publicRecords["SEC EDGAR, Brønnøysund, RDAP, IFSC and GLEIF"]
+    council <-->|"Gemini reviews"| vertex["Google Cloud Vertex AI"]
+    seal -->|"Save case, evidence, trace and receipt"| db[("Firestore")]
+    seal -->|"Return the filed case after saving"| browser
+```
+
+</details>
+
+[Architecture guide and API endpoints](docs/system-architecture.md) · [Full-size presentation image](docs/diagrams/system-architecture.png)
+
+## User flow
+
+![A reviewer can start a live case and watch agent handoffs, or open a saved case from the ledger. Both paths lead to the evidence, human follow-up and receipt verification.](docs/diagrams/user-flow.png)
+
+<details>
+<summary>Explore the user flow in Mermaid</summary>
+
+```mermaid
+flowchart TD
+    start["Open the workspace"] -->|"New investigation"| desk["Choose Payment, Candidate, Estate or Company"]
+    desk --> enter["Enter the subject, identifiers and any required consent"]
+    enter --> live["Submit the case and watch the live trace"]
+    live -->|"Case filed"| file["Inspect the finding and dated evidence"]
+    start -->|"Previous investigation"| ledger["Select a saved case in the Ledger"]
+    ledger -->|"Read the stored record"| file
+    file --> trace["Replay agent handoffs and inspect specialist reports"]
+    file --> review["Add a human review in the Discussion room"]
+    file --> verify["Verify the case receipt"]
+```
+
+</details>
+
+[User flow guide and screen-by-screen walkthrough](docs/user-flow.md) · [Full-size presentation image](docs/diagrams/user-flow.png)
 
 ## ![Crustdata in practice](docs/brand/crustdata-in-practice.svg)
 
