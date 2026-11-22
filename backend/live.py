@@ -13,6 +13,7 @@ from .estate import estate_evidence
 from .destination import screen_destination
 from .progress import report
 from .vendor import vendor_records
+from .forecast import forecast_window
 
 
 def collect_live(desk, subject, consent=False, inputs=None):
@@ -104,6 +105,19 @@ def collect_live(desk, subject, consent=False, inputs=None):
             result["signals"].extend({"type": "claim_observation", "claim": c["claim"],
                                       "evidence_id": c["id"]} for c in cards)
     result.update(mode="live", subject=subject, consent=consent)
+    if desk == "company" and len(matches) == 1 and isinstance(cid, int) and not any(
+            s.get("status") == "unresolved" for s in interpreted["steps"]):
+        response = next((e for e in raw["evidence"] if e["operation"] == "company_enrich"), {})
+        records = response.get("data") or []
+        enrich_matches = records[0].get("matches", []) if isinstance(records, list) and records else []
+        enriched = enrich_matches[0].get("company_data", {}) if len(enrich_matches) == 1 else {}
+        if enriched.get("crustdata_company_id") == cid:
+            forecast = forecast_window(cid, enriched, interpreted["evidence"], datetime.now(timezone.utc).date())
+            if forecast:
+                result["forecast"] = forecast
+                result["evidence"].append({"label":"Interim finance appointment", "source":"Crustdata",
+                                           "as_of":response["as_of"], "mode":"LIVE", "url":response["source"],
+                                           "detail":f"An interim finance role started on {forecast['observed_on']}."})
     if person and consent is not True:
         result['signals'].append(dict(type='consent_required', provider='crustdata', operation='person_enrich', status='skipped'))
     if desk == "estate" and len(matches) == 1:

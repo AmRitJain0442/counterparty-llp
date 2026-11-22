@@ -1,4 +1,5 @@
 """Counterparty LLP single-origin application."""
+import os
 import asyncio
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -173,7 +174,19 @@ def investigate(intake: Intake):
         case["reviews"] = reviews
         case["steps"].extend(reviews[role] for role in agents)
     progress.report("Ledger", "running", "Committing the evidence receipt")
-    receipt = create_receipt(case)
+    if raw.get("forecast"):
+        case["forecast"] = raw["forecast"]
+    if intake.mode == "live" and case["verdict"] == "FORECAST FOR REVIEW" and os.getenv("REKOR_ENABLED") == "1":
+        signed = {**case, "verdict": "SIGNED"}
+        try:
+            receipt = create_receipt(signed, publish=True)
+            case = signed
+        except ReceiptError:
+            case["steps"].append({"name":"Partner signing", "status":"unavailable",
+                                  "detail":"Public timestamp verification is pending."})
+            receipt = create_receipt(case)
+    else:
+        receipt = create_receipt(case)
     case["receipt_record"] = receipt
     case["receipt"] = receipt["digest"]
     save_case(case)
