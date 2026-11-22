@@ -1,6 +1,7 @@
-﻿import React, {useState} from 'react'
+import React, {useState} from 'react'
 import {createRoot} from 'react-dom/client'
 import DiscussionRoom from './DiscussionRoom'
+import EstateArchive from './EstateArchive'
 import ProviderRoom from './ProviderRoom'
 import LiveWorkbench from './LiveWorkbench'
 import './workbench.css'
@@ -10,6 +11,7 @@ const views = {
   flow: ['Discussion room', DiscussionRoom],
   live: ['Live investigation', LiveWorkbench],
   providers: ['Provider room', ProviderRoom],
+  archive: ['Estate archive', EstateArchive],
 }
 function Workspace() {
   const getTab=()=>Object.hasOwn(views,location.hash.slice(1))?location.hash.slice(1):'flow'
