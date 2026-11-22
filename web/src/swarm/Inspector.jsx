@@ -1,12 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { DESKS, DESK_BY_ID } from '../desks'
+import { formatCredits } from '../format'
 import './inspector.css'
 
 const GROUPS = [
   ['identity', 'Identity', 'Resolve who or what the subject is'],
   ['discovery', 'Discovery', 'Collect dated witnesses'],
-  ['challenge', 'Challenge', 'Try to break the finding'],
-  ['decision', 'Decision', 'Sign, hold or kill'],
+  ['challenge', 'Challenge', 'Test competing explanations'],
+  ['decision', 'Decision', 'Reconcile findings and file the case'],
 ]
 const STATUS_LABEL = { idle: 'Idle', queued: 'Queued', running: 'Running', done: 'Done', complete: 'Done', ok: 'Done', error: 'Failed', failed: 'Failed', blocked: 'Blocked', held: 'Held' }
 
@@ -25,10 +26,13 @@ const optName = o => (typeof o === 'string' ? o : o.label ?? o.name ?? o.title ?
 export default function Inspector({
   desk, agent, agents = [], events = [], onSelect, onClose, onRun, running, record, mode = 'demo', setMode,
   subject = '', setSubject, inputs = {}, setInputs, consent = false, setConsent, onDesk, caseOptions = [], onCase, error,
+  section, setSection, onReplay, replaying, runMode,
 }) {
   const spec = DESK_BY_ID[desk] || DESKS[0]
   const [open, setOpen] = useState({})
   const [caseId, setCaseId] = useState('')
+  const body = useRef(null)
+  useEffect(() => { body.current?.scrollTo(0, 0) }, [section, agent?.id, desk])
   const live = mode === 'live'
 
   const latest = useMemo(() => {
@@ -42,11 +46,10 @@ export default function Inspector({
     return m
   }, [agents])
 
-  const gi = agent ? GROUPS.findIndex(([g]) => g === agent.group) : -1
-  const upstream = gi > 0 ? byGroup[GROUPS[gi - 1][0]] : []
-  const downstream = gi >= 0 && gi < GROUPS.length - 1 ? byGroup[GROUPS[gi + 1][0]] : []
+  const upstream = agents.filter(a => agent?.depends_on?.includes(a.id))
+  const downstream = agents.filter(a => a.depends_on?.includes(agent?.id))
   const ev = agent ? latest[agent.id] : null
-  const agentEvents = agent ? events.filter(e => e.agent_id === agent.id) : []
+  const report = record?.swarm_reports?.find(r => r.agent_id === agent?.id)
   const recent = events.slice(-8).reverse()
   const needsConsent = live && (spec.alwaysConsent || spec.consentFor?.some(k => (inputs[k] || '').trim()))
   const rosterOpen = g => open[g] ?? (agent ? agent.group === g : g === 'identity')
@@ -57,47 +60,38 @@ export default function Inspector({
   return (
     <aside className="insp" style={{ '--desk': spec.color }} aria-label="Agent inspector">
       <header className="insp-head">
-        <div className="insp-title"><b>{agent ? agent.name : spec.name}</b><span>{agent ? `${agent.group} · ${agent.lane || 'unassigned lane'}` : spec.alias}</span></div>
-        <button type="button" className="insp-x" onClick={onClose} aria-label="Close inspector">Close</button>
+        <div className="insp-title"><span>{section === 'agents' && agent ? agent.group + ' swarm' : 'Investigation desk'}</span>
+          <b>{section === 'agents' && agent ? agent.name : spec.name + ' investigation'}</b></div>
+        <button type="button" className="insp-x" onClick={onClose} aria-label="Close inspector">×</button>
       </header>
-
-      <div className="insp-body">
+      <nav className="insp-tabs" aria-label="Inspector sections">
+        {['agents','run','trace'].map(t => <button key={t} type="button" aria-current={section === t ? 'page' : undefined}
+          onClick={() => setSection(t)}>{t === 'agents' ? 'Agents' : t === 'run' ? 'Run' : 'Trace'}</button>)}
+      </nav>
+      <div className="insp-body" ref={body}>
+        {error && <p className="insp-err" role="alert">{error}</p>}
+        {section !== 'trace' && <>
         <div className="insp-desks" role="tablist" aria-label="Desk">
           {DESKS.map(d => (
             <button key={d.id} type="button" role="tab" aria-selected={d.id === desk} style={{ '--c': d.color }}
-              className={d.id === desk ? 'on' : ''} onClick={() => onDesk?.(d.id)}>{d.name}</button>
+              disabled={running} className={d.id === desk ? 'on' : ''} onClick={() => onDesk?.(d.id)}>{d.name}</button>
           ))}
         </div>
-        <p className="insp-q">{spec.question}</p>
+        <p className="insp-q">{spec.question}</p></>}
 
-        {agent && (
-          <section className="insp-sec">
-            <h3>Selected agent</h3>
-            <ol className="insp-chain" aria-label="Agent hierarchy">
-              {GROUPS.map(([g, name], i) => (
-                <li key={g} className={i === gi ? 'on' : i < gi ? 'past' : ''}>
-                  <span className="insp-g">{name}</span>
-                  {i === gi
-                    ? <div className="insp-sel"><b>{agent.name}</b><span className={`insp-st ${statusClass(ev?.status)}`}>{label(ev?.status)}</span></div>
-                    : <span className="insp-n">{byGroup[g].length ? byGroup[g].map(a => a.name).join(', ') : 'No agents'}</span>}
-                </li>
-              ))}
-            </ol>
-            <dl className="insp-facts">
-              <div><dt>Task</dt><dd>{agent.task || 'No task recorded'}</dd></div>
-              <div><dt>Lane</dt><dd>{agent.lane || 'None'}</dd></div>
-              <div><dt>Receives from</dt><dd>{upstream.length ? upstream.map(a => a.name).join(', ') : gi === 0 ? 'Case inputs from the run form' : 'Nothing upstream'}</dd></div>
-              <div><dt>Hands off to</dt><dd>{downstream.length ? downstream.map(a => a.name).join(', ') : 'Filed decision'}</dd></div>
-              <div><dt>Latest report</dt><dd>{ev?.detail || 'No report yet'}</dd></div>
-            </dl>
-            {agentEvents.length > 1 && (
-              <ul className="insp-log">{agentEvents.slice(-4).map((e, i) => <li key={i}><span className={`insp-st ${statusClass(e.status)}`}>{label(e.status)}</span>{e.detail}</li>)}</ul>
-            )}
-          </section>
-        )}
-
+        {section === 'agents' && <>
+        {agent && <section className="insp-sec">
+          <h3>Assignment</h3><p>{agent.task.replace(/^.*?: /,'')}</p>
+          <dl className="insp-facts">
+            <div><dt>Receives from</dt><dd>{upstream.map(a=>a.name).join(', ') || 'Case evidence'}</dd></div>
+            <div><dt>Hands off to</dt><dd>{downstream.map(a=>a.name).join(', ') || 'Case ledger'}</dd></div>
+            <div><dt>Status</dt><dd>{label(ev?.status)}</dd></div>
+          </dl>
+          {report && <details className="agent-report"><summary>Read agent report</summary><p>{report.detail}</p>
+            {report.refs.map(id => <p key={id}>{record.evidence.find(e=>e.id===id)?.label || id}</p>)}</details>}
+        </section>}
         <section className="insp-sec">
-          <h3>Roster</h3>
+          <h3>Swarm roster <span>{agents.length} agents</span></h3>
           {GROUPS.map(([g, name, hint]) => (
             <div key={g} className="insp-acc">
               <button type="button" aria-expanded={rosterOpen(g)} onClick={() => setOpen({ ...open, [g]: !rosterOpen(g) })}>
@@ -119,8 +113,9 @@ export default function Inspector({
           ))}
         </section>
 
-        <form className="insp-sec insp-form" onSubmit={submit}>
-          <h3>Run</h3>
+        </>}
+        {section === 'run' && <form className="insp-sec insp-form" onSubmit={submit}>
+          <h3>Investigation mode</h3>
           <div className="insp-mode" role="radiogroup" aria-label="Run mode">
             {['demo', 'live'].map(m => (
               <label key={m} className={mode === m ? 'on' : ''}>
@@ -128,15 +123,6 @@ export default function Inspector({
               </label>
             ))}
           </div>
-
-          {!live && caseOptions.length > 0 && (
-            <label className="insp-f"><span>Seeded case</span>
-              <select value={caseId} onChange={e => { setCaseId(e.target.value); onCase?.(e.target.value) }}>
-                <option value="">Default case</option>
-                {caseOptions.map(o => <option key={optId(o)} value={optId(o)}>{optName(o)}</option>)}
-              </select>
-            </label>
-          )}
 
           <label className="insp-f"><span>{live ? 'Subject' : 'Subject (optional)'}</span>
             <input value={subject} maxLength={180} required={live} onChange={e => setSubject?.(e.target.value)}
@@ -159,12 +145,23 @@ export default function Inspector({
           )}
 
           {live && <p className="insp-note">Live runs spend about {spec.credits} credits. Demo runs spend none.</p>}
-          {error && <p className="insp-err" role="alert">{error}</p>}
           <button type="submit" className="insp-run" disabled={running || missing}>
             {running ? 'Collecting evidence…' : live ? `Open a live ${spec.name} case` : `Run the ${spec.name} demo`}
           </button>
-        </form>
-
+        </form>}
+        {section === 'trace' && <>
+        <section className="insp-sec trace-toolbar"><h3>Investigation trace</h3>
+          {caseOptions.length > 0 && (
+            <label className="insp-f"><span>Filed investigation</span>
+              <select disabled={running} value={caseId} onChange={e => { setCaseId(e.target.value); onCase?.(e.target.value) }}>
+                <option value="">Select a recorded trace</option>
+                {caseOptions.map(o => <option key={optId(o)} value={optId(o)}>{optName(o)}</option>)}
+              </select>
+            </label>
+          )}
+          {events.length > 0 && <p>{runMode === 'demo' ? 'Synthetic investigation' : 'Live investigation'} · {events.filter(e=>e.agent_id && e.event === 'end').length} of {agents.length} agent reports</p>}
+          {record && <button type="button" className="trace-replay" onClick={onReplay}>{replaying ? 'Restart replay' : 'Replay handoffs'} ↻</button>}
+        </section>
         {record && (
           <section className="insp-sec insp-result" aria-live="polite">
             <h3>Filed decision</h3>
@@ -180,7 +177,7 @@ export default function Inspector({
               </div>
             )}
             <p className="insp-meta">
-              {record.credits != null ? `${record.credits} credits` : 'Credits unknown'}
+              {formatCredits(record.credits)}
               {record.receipt && <> · Receipt <code>{String(record.receipt).slice(0, 16)}</code></>}
             </p>
           </section>
@@ -194,14 +191,15 @@ export default function Inspector({
                 {recent.map((e, i) => (
                   <li key={i}>
                     <button type="button" onClick={() => e.agent_id && onSelect?.(e.agent_id)}>
-                      <span className="insp-who">{e.name || e.agent_id}<span className={`insp-st ${statusClass(e.status)}`}>{label(e.status)}</span></span>
+                      <span className="insp-who">{e.name || e.agent_id || 'Collection'}<span className={`insp-st ${statusClass(e.status)}`}>{label(e.status)}</span></span>
                       {e.detail && <span className="insp-d">{e.detail}</span>}
                     </button>
                   </li>
                 ))}
               </ul>}
-        </section>
+        </section></>}
       </div>
+      {section === 'agents' && <footer className="insp-footer"><button type="button" onClick={()=>setSection(running?'trace':'run')}>{running?'View investigation trace':'Configure investigation'} <span>↗</span></button></footer>}
     </aside>
   )
 }

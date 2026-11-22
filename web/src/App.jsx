@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Logo from './components/Logo'
-import FirmMap from './components/FirmMap'
+import SwarmAtlas from './swarm/SwarmAtlas'
 import DeskStudio from './components/DeskStudio'
 import CaseFile from './components/CaseFile'
 import Sankey, { SPECIMEN_FLOWS } from './components/Sankey'
@@ -58,11 +58,6 @@ export default function App() {
     }
   }, [record])
 
-  const openDesk = id => {
-    setDeskId(id)
-    document.getElementById('desks')?.scrollIntoView({ behavior: 'smooth' })
-  }
-
   const onFiled = filed => {
     setRecordError('')
     pendingScroll.current = true
@@ -92,10 +87,16 @@ export default function App() {
 
   return (
     <>
+      <SwarmAtlas desk={deskId} onDesk={setDeskId} cases={cases} onFile={filed => {
+        setRecordError('')
+        setRecord(filed)
+        setCases(rows => [filed, ...rows.filter(row => row.id !== filed.id)])
+      }} />
       <header className="topbar">
         <div className="wrap">
-          <a href="#top" aria-label="Counterparty LLP, top of page"><Logo /></a>
+          <a href="#swarm" aria-label="Counterparty LLP, top of page"><Logo /></a>
           <nav className="nav" aria-label="Sections">
+            <a href="#swarm">Swarm map</a>
             <a href="#desks">Desks</a>
             <a href="#flows">Flows</a>
             <a href="#ledger">Ledger</a>
@@ -106,33 +107,6 @@ export default function App() {
       </header>
 
       <main id="top">
-        <section className="hero">
-          <div className="wrap">
-            <div className="hero-grid">
-              <div>
-                <span className="label hot">Trust and compliance · four desks · one ledger</span>
-                <h1>Who’s on the <em>other side?</em></h1>
-              </div>
-              <div className="hero-side">
-                <p className="hero-lede">
-                  Trace a counterparty claim through employment records, registries and filings. Follow each desk to the evidence behind its decision.
-                </p>
-                <div className="hero-actions">
-                  <a className="btn primary" href="#desks">Run a desk</a>
-                  <a className="btn" href="#ledger">Read the ledger</a>
-                </div>
-              </div>
-            </div>
-            <FirmMap onOpen={openDesk} />
-            <div className="hero-facts">
-              <div><b>4</b><span>desks, each ending in one verdict</span></div>
-              <div><b>2</b><span>witnesses before anything adverse is signed</span></div>
-              <div><b>0 cr</b><span>to run all four synthetic cases</span></div>
-              <div><b>0</b><span>automated legal effects. A person calls back</span></div>
-            </div>
-          </div>
-        </section>
-
         <section className="section" id="desks">
           <div className="wrap">
             <div className="section-head">
