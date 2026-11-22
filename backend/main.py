@@ -164,11 +164,13 @@ def investigate(intake: Intake):
     for index, row in enumerate(case["evidence"], start=1):
         row.setdefault("id", f"source-card-{index}")
     trace = []
+    stream_event = progress.current_sink()
 
     def observe(item):
         event = {"type": "step", "at": datetime.now(timezone.utc).isoformat(), **item}
         trace.append(event)
-        progress.send(event)
+        if stream_event:
+            stream_event(event)
 
     reports = run_council(intake.desk, case["evidence"], ruling["verdict"], observe, intake.mode)
     case["collection_events"] = collections

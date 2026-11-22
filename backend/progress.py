@@ -16,10 +16,9 @@ def report(name, status, detail, *, collection_agent=None):
         sink(event)
 
 
-def send(event):
-    sink = _sink.get()
-    if sink:
-        sink(event)
+def current_sink():
+    """Capture this investigation's stream before dispatching work to other threads."""
+    return _sink.get()
 
 
 def attach(sink):

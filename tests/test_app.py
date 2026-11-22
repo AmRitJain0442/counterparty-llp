@@ -41,6 +41,9 @@ def test_stream_completes_with_persisted_case(client):
     assert any(e["type"] == "step" for e in events)
     assert events[-1]["type"] == "case"
     case = events[-1]["case"]
+    streamed = [event for event in events if event.get("agent_id")]
+    assert len(streamed) == 72
+    assert streamed == case["swarm_events"]
     assert client.get("/api/cases/" + case["id"]).json() == case
 
 
