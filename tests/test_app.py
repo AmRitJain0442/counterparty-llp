@@ -21,6 +21,9 @@ def test_demo_filed_and_retrievable(client, desk):
     case = response.json()
     assert case["mode"] == "demo"
     assert case["evidence"] and case["verdict"] and case["receipt"]
+    roster = client.get(f"/api/swarms/{desk}").json()["agents"]
+    assert case["swarm_roster"] == roster
+    assert {a["id"] for a in roster} == {r["agent_id"] for r in case["swarm_reports"]}
     assert client.get("/api/cases/" + case["id"]).json() == case
     assert client.get("/api/cases").json() == [case]
 
@@ -72,7 +75,7 @@ def test_live_challenge_can_refer_a_proposed_finding(client, monkeypatch, assess
         "steps": [], "flows": [], "credits": 0,
     })
     monkeypatch.setattr(main, "adjudicate", lambda *a: {"verdict":"FORECAST FOR REVIEW", "summary":"Reviewable finding"})
-    def review(desk, evidence, verdict, role):
+    def review(desk, evidence, verdict, role, **assignment):
         choice = assessment if role == "counsel" else "ready"
         return {"note": "Check the dated filing.", "assessment": choice, "refs": ["card"]}, "complete"
     monkeypatch.setattr(swarm, "draft_note", review)
@@ -83,3 +86,24 @@ def test_live_challenge_can_refer_a_proposed_finding(client, monkeypatch, assess
     referrals = case["council_decision"]["referred_by"]
     assert referrals == (["Scope challenger", "Timing challenger"] if assessment == "needs_evidence" else [])
     assert client.get("/api/cases/" + case["id"] + "/receipt").status_code == 200
+
+
+def test_specialist_concern_reaches_the_filed_decision(client, monkeypatch):
+    from backend import swarm
+
+    evidence = [{"id": "filing", "source": "Registry", "label": "Dated filing", "detail": "Two entities share a name."}]
+    monkeypatch.setattr(main, "collect_live", lambda *args: dict(evidence=evidence, steps=[], flows=[], credits=0))
+    monkeypatch.setattr(main, "adjudicate", lambda *args: dict(verdict="FORECAST FOR REVIEW", summary="Proposed forecast"))
+    specialist = next(a for a in swarm.agents_for("company") if a["parent_id"] == "identity")
+
+    def review(desk, evidence, verdict, role, *, persona, mandate):
+        assessment = "needs_evidence" if persona == specialist["persona"] else "ready"
+        return {"note": "Compare issuer registration numbers.", "assessment": assessment, "refs": ["filing"]}, "complete"
+
+    monkeypatch.setattr(swarm, "draft_note", review)
+    case = client.post("/api/cases", json={"desk": "company", "subject": "Example", "mode": "live"}).json()
+    assert case["verdict"] == "PARTNER REVIEW"
+    decision = case["council_decision"]
+    assert decision["specialist_referrals"] == [specialist["id"]]
+    assert "Identity resolver" in decision["referred_by"]
+    assert client.get("/api/cases/" + case["id"] + "/receipt").json()["digest"] == case["receipt"]

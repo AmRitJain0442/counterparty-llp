@@ -172,20 +172,25 @@ def investigate(intake: Intake):
 
     reports = run_council(intake.desk, case["evidence"], ruling["verdict"], observe, intake.mode)
     case["collection_events"] = collections
+    case["swarm_roster"] = agents_for(intake.desk)
     case["swarm_events"] = trace
     case["swarm_reports"] = reports
-    case["steps"].extend({k: report[k] for k in ("name", "status", "detail")} for report in reports)
+    leads = [report for report in reports if not report.get("parent_id")]
+    case["steps"].extend({k: report[k] for k in ("name", "status", "detail")} for report in leads)
     by_id = {r["agent_id"]: r for r in reports}
     if intake.mode == "live":
         case["reviews"] = {"analyst": by_id["analyst_scope"], "counsel": by_id["challenger_scope"]}
         partner = by_id["partner"]
         if partner["status"] == "complete":
             case["draft"] = partner["detail"]
-        reviewers = [r for r in reports if r["agent_id"].startswith(("analyst_", "challenger_")) or r["agent_id"] == "partner"]
-        referrals = [r["name"] for r in reviewers if r.get("assessment") == "needs_evidence" or r["status"] != "complete"]
-        case["council_decision"] = {"proposed_verdict": ruling["verdict"], "referred_by": referrals,
-                                    "disposition": "further review" if referrals else "review complete"}
-        if referrals and ruling["verdict"] in {"HELD", "FORECAST FOR REVIEW", "REQUEST FOR EXPLANATION", "FAILED", "KILLED"}:
+        flagged = [r for r in reports if r.get("assessment") == "needs_evidence" or r["status"] != "complete"]
+        case["council_decision"] = {
+            "proposed_verdict": ruling["verdict"],
+            "referred_by": [r["name"] for r in flagged if not r.get("parent_id")],
+            "specialist_referrals": [r["agent_id"] for r in flagged if r.get("parent_id")],
+            "disposition": "further review" if flagged else "review complete",
+        }
+        if flagged and ruling["verdict"] in {"HELD", "FORECAST FOR REVIEW", "REQUEST FOR EXPLANATION", "FAILED", "KILLED"}:
             case["verdict"] = "PARTNER REVIEW"
             case["summary"] = "The council referred the proposed finding for further evidence. Review the flagged agent reports before acting."
     progress.report("Ledger", "running", "Committing the evidence receipt")
