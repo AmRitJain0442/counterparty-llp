@@ -48,7 +48,7 @@ def agents_for(desk):
     return leads + children
 
 
-def run_council(desk, evidence, verdict, emit, mode):
+def run_council(desk, evidence, verdict, emit, mode, *, verdict_summary='', proposition=''):
     """Run parallel stages, emitting serialized events with completed dependencies.
 
     All runtime state belongs to this invocation. Live model failures remain visible
@@ -66,7 +66,8 @@ def run_council(desk, evidence, verdict, emit, mode):
         with event_lock:
             sink(event)
     agents = {a['id']: a for a in agents_for(desk)}
-
+    decision_context = dict(label='Evidence gate rationale', detail=verdict_summary, claim=proposition or '',
+                            source='Case adjudication')
 
     def work(key, deps):
         agent = agents[key]
@@ -91,7 +92,8 @@ def run_council(desk, evidence, verdict, emit, mode):
             else:
                 dependencies = [dict(label=f'Dependency {r["agent_id"]}', detail=f"{r.get('assessment') or 'Observation'}: {r['detail']}",
                                  source=', '.join(r['refs'])) for r in upstream]
-                context = [dict(label='Bounded assignment', detail=agent['task'], source='Council'), *dependencies, *rows]
+                context = [dict(label='Bounded assignment', detail=agent['task'], source='Council'), decision_context,
+                           *dependencies, *rows]
                 role = 'counsel' if key.startswith('challenger') else 'analyst'
                 review, status = draft_note(desk, context, verdict, 'partner' if key == 'partner' else role, persona=agent['persona'], mandate=agent['task'])
                 if review:
@@ -157,7 +159,7 @@ def run_council(desk, evidence, verdict, emit, mode):
                 dependencies = [dict(label=f"Dependency {r['agent_id']}",
                                  detail=f"{r['status']} / {r.get('assessment')}: {r['detail']}",
                                  source=', '.join(r['refs'])) for r in upstream]
-                review, status = draft_note(desk, [*dependencies, *rows], verdict, 'analyst',
+                review, status = draft_note(desk, [decision_context, *dependencies, *rows], verdict, 'specialist',
                                             persona=spec['persona'], mandate=spec['task'])
             if review is None:
                 result = failure(agent, status)

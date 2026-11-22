@@ -172,7 +172,8 @@ def investigate(intake: Intake):
         if stream_event:
             stream_event(event)
 
-    reports = run_council(intake.desk, case["evidence"], ruling["verdict"], observe, intake.mode)
+    reports = run_council(intake.desk, case["evidence"], ruling["verdict"], observe, intake.mode,
+                          verdict_summary=ruling["summary"], proposition=raw.get("proposition"))
     case["collection_events"] = collections
     case["swarm_roster"] = agents_for(intake.desk)
     case["swarm_events"] = trace

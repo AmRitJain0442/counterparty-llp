@@ -29,11 +29,16 @@ def test_live_parallel_fanout_and_context(monkeypatch):
     analyst = Barrier(2)
     challenger = Barrier(2)
     calls = []
+    specialists = set()
 
     def note(desk, evidence, verdict, role, **instructions):
         task = instructions['mandate']
         assert instructions['persona']
         assert any(r.get('id') == 'e1' for r in evidence)
+        rationale = next(r for r in evidence if r['label'] == 'Evidence gate rationale')
+        assert rationale['detail'] == 'The independent records agree.' and rationale['claim'] == 'Vendor domain'
+        if role == 'specialist':
+            specialists.add(instructions['persona'])
         calls.append(evidence)
         if task.startswith('payment: Assess'):
             analyst.wait(timeout=3)
@@ -42,8 +47,10 @@ def test_live_parallel_fanout_and_context(monkeypatch):
         return {'note':task, 'assessment':'ready', 'refs':['e1']}, 'complete'
 
     monkeypatch.setattr(swarm, 'draft_note', note)
-    reports = swarm.run_council('payment', ROWS, 'HELD', lambda e: None, 'live')
+    reports = swarm.run_council('payment', ROWS, 'HELD', lambda e: None, 'live',
+                                verdict_summary='The independent records agree.', proposition='Vendor domain')
     assert len(calls) == 29
+    assert len(specialists) == 24
     assert all(r['status'] == 'complete' for r in reports)
     partner = next(c for c in calls if any(r.get('label') == 'Dependency challenger_scope' for r in c) and any(r.get('label') == 'Bounded assignment' for r in c))
     assert {r['label'] for r in partner} >= {'Dependency challenger_scope', 'Dependency challenger_timing'}
