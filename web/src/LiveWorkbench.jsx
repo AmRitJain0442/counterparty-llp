@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { streamCase } from './streamCase'
 
 const names = {payment:'Payment',candidate:'Candidate',estate:'Estate',company:'Company'}
@@ -32,7 +32,7 @@ export default function LiveWorkbench({startDesk='estate'}) {
   }
   const lanes=Object.values(events.reduce((acc,ev)=>({...acc,[ev.name]:ev}),{}))
   return <section className="live-bench">
-    <header><small>PROVIDER WORKSPACE</small><h1>Live investigation</h1><p>Trace collection, challenge and filing as each desk reports back.</p></header>
+    <header><small>PROVIDER WORKSPACE</small><h1>Live investigation</h1><p>Every run here queries live providers and spends metered credits. Trace collection, challenge and filing as each desk reports back.</p></header>
     <div className="bench-grid"><form onSubmit={submit}><fieldset disabled={busy}>
       <label>Desk<select value={desk} onChange={e=>choose(e.target.value)}>{Object.entries(names).map(([id,n])=><option key={id} value={id}>{n}</option>)}</select></label>
       <label>Subject<input required value={subject} maxLength={180} onChange={e=>setSubject(e.target.value)} /></label>
