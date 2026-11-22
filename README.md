@@ -10,6 +10,8 @@
 
 [Investor pitch](docs/investor-pitch.md) · [Hinglish pitch aur team guide](docs/investor-pitch-hinglish.md) · [Buyer pitch, feature guide and live API status](docs/sales-guide.md)
 
+[Watch the narrated Payment desk walkthrough (2:28)](docs/Counterparty-Live-Walkthrough.mp4) · [Open the case from the video](https://counterparty-939419364980.asia-south1.run.app/?case=502f0fdef9ed4e6081881ff25b39c118#swarm) · [Presenter script and input fields](docs/Counterparty-Recording-Script.docx)
+
 The replay opens a real company investigation without spending provider credits. Select **Scope analyst** on the map to see what its two specialists checked and which evidence they cited.
 
 [![The Company desk with the Scope analyst selected. The inspector lists its assignment, handoffs and two completed specialist reports.](docs/brand/swarm-inspector.png)](https://counterparty-939419364980.asia-south1.run.app/?case=c4b983b065f7413daaf908c9ab06f9a6#swarm)
