@@ -1,11 +1,15 @@
 """Public browser boundary. Raw provider records never leave this module."""
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import copy_context
+from datetime import datetime, timezone
 import re
 from .providers import run_live
 from .identity import resolve_public_ids
 from .observations import describe
 from .colleagues import overlap_count
+from .estate import estate_evidence
+from .destination import screen_destination
+from .progress import report
 
 
 def collect_live(desk, subject, consent=False, inputs=None):
@@ -80,4 +84,21 @@ def collect_live(desk, subject, consent=False, inputs=None):
                   signals=raw['signals'])
     if person and consent is not True:
         result['signals'].append(dict(type='consent_required', provider='crustdata', operation='person_enrich', status='skipped'))
+    if desk == "estate" and len(matches) == 1:
+        registry = next((e.get("data") for e in raw["evidence"] if e["operation"] == "brreg"), {}) or {}
+        registry_name = str(registry.get("navn") or "").casefold().strip()
+        company_name = (company.get("basic_info") or {}).get("name", "").casefold().strip()
+        if registry_name and registry_name == company_name and registry.get("konkurs") is True:
+            filed = registry.get("konkursdato")
+            report("Estate employee flows", "running", "Examining dated employment histories in aggregate")
+            estate = estate_evidence(subject, domain, company, filed, datetime.now(timezone.utc))
+            result["evidence"].extend(estate["evidence"])
+            result["flows"] = estate["flows"]
+            result["steps"].extend(estate["steps"])
+            if estate["steps"] and any(step["name"] == "person_search" for step in estate["steps"]):
+                result["credits"] = (round(result["credits"] + estate["credits"], 4)
+                                     if result["credits"] is not None and estate["credits"] is not None else None)
+            roles = next((e.get("data") for e in raw["evidence"] if e["operation"] == "brreg_roles"), {})
+            result["evidence"].extend(screen_destination(estate["flows"], safe.get("orgnr"), roles, filed))
+            report("Estate employee flows", estate["status"], "Estate cohort review complete")
     return result
