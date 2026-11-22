@@ -4,6 +4,8 @@
 
 **[Open the workspace](https://counterparty-939419364980.asia-south1.run.app/)** · **[Replay a completed investigation](https://counterparty-939419364980.asia-south1.run.app/?case=c4b983b065f7413daaf908c9ab06f9a6#swarm)** · [Run locally](#run-locally)
 
+[Buyer demo script, feature guide and live API status](docs/sales-demo.md)
+
 The replay opens a real company investigation without spending provider credits. Select **Scope analyst** on the map to see what its two specialists checked and which evidence they cited.
 
 [![The Company desk with the Scope analyst selected. The inspector lists its assignment, handoffs and two completed specialist reports.](docs/brand/swarm-inspector.png)](https://counterparty-939419364980.asia-south1.run.app/?case=c4b983b065f7413daaf908c9ab06f9a6#swarm)
