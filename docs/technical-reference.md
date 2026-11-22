@@ -1,5 +1,7 @@
 # Technical reference
 
+[System architecture](system-architecture.md) · [User flow](user-flow.md)
+
 Counterparty serves its React frontend and FastAPI routes on the same origin. The public deployment uses Cloud Run and Firestore in Mumbai. The local launcher uses SQLite by default and writes to `.local/ledger.sqlite3`. Everyone using the same deployment shares its ledger.
 
 ## Live configuration
@@ -25,7 +27,9 @@ The Windows launcher can read a DPAPI-protected Crustdata token and an ADC path 
 | GET | `/api/cases` | Shared ledger in reverse creation order |
 | GET | `/api/cases/{id}` | A case’s evidence, decision, reports, provider credits and receipt |
 | GET | `/api/cases/{id}/receipt` | Verify the stored decision commitment |
+| GET, POST | `/api/cases/{id}/reviews` | Read or append human review notes and dispositions |
 | GET | `/api/capabilities` | Current Crustdata balance, prices and endpoint entitlements |
+| GET | `/api/watch` | Configured company watch and its recent runs |
 | GET | `/api/health` | Service health |
 | GET | `/docs` | Interactive API schema |
 
