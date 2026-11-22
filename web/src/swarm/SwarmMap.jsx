@@ -119,7 +119,7 @@ export default function SwarmMap({agents,selected,onSelect,events,running,previe
             </circle>}
             <path d={v.path} stroke={color} strokeWidth="1.25" opacity={focus ? 1 : .73}/></g>)}
           <path d={'M'+point(polar(n.angle,279))+'L'+point(end)} stroke={color} opacity=".6" strokeDasharray="2 3"/>
-          <circle cx={n.pos[0]} cy={n.pos[1]} r={focus?13:9} fill="#171610" stroke={color}/>
+          <circle cx={n.pos[0]} cy={n.pos[1]} r={focus?13:9} fill="#0d0c0a" stroke={color}/>
           <circle cx={n.pos[0]} cy={n.pos[1]} r={focus?7:4.5} fill="none" stroke={color}/>
           <circle cx={n.pos[0]} cy={n.pos[1]} r="2" fill={color}/>
           {focus && <path d={arc(n.angle-n.step*.44,n.angle+n.step*.44,275)} fill="none" stroke="#ff845b" strokeWidth="1.6"/>}

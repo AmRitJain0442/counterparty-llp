@@ -1,7 +1,9 @@
+@import './display-font.css';
+
 @font-face {font-family:Recursive;src:url(/fonts/recursive.woff2) format("woff2");font-weight:300 1000;font-style:oblique 0deg 15deg;font-display:swap;}
 /* Layout: a warm-dark evidence room. One accent (hot), four desk colours that only ever mean a desk. */
 :root {
-  --bg: #13120e;
+  --bg: #0d0c0a;
   --raise: #1c1a14;
   --raise-2: #23211a;
   --line: #322f25;
@@ -53,14 +55,14 @@ code, .mono { font-family: var(--mono); font-variation-settings: 'MONO' 1, 'CASL
 .label { font: 600 .72rem/1.4 var(--mono); font-variation-settings: 'MONO' 1; letter-spacing: .09em; text-transform: uppercase; color: var(--dim); }
 .label.hot { color: var(--hot); }
 .section-head { display: grid; gap: 14px; max-width: 760px; margin-bottom: clamp(28px, 5vw, 52px); }
-.section-head h2 { font-size: clamp(1.9rem, 4.4vw, 3.2rem); line-height: 1.04; letter-spacing: -.035em; font-weight: 800; }
+.section-head h2 { font-family: var(--display-font); font-size: clamp(1.9rem, 4.4vw, 3.2rem); line-height: 1.12; letter-spacing: -.015em; font-weight: 800; }
 .section-head p { color: var(--ink-2); max-width: 62ch; }
 
 /* header */
 .topbar { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); padding-top: env(safe-area-inset-top, 0px); }
 .topbar .wrap { display: flex; align-items: center; gap: 18px; min-height: 60px; }
 .logo { display: inline-flex; align-items: center; gap: 10px; color: var(--hot); text-decoration: none; }
-.logo-word { color: var(--ink); font-weight: 800; letter-spacing: -.045em; font-size: 1.22rem; }
+.logo-word { color: var(--ink); font-family: var(--display-font); font-weight: 800; letter-spacing: .015em; font-size: 1.45rem; }
 .logo-llp { font: 600 .72rem var(--mono); font-variation-settings: 'MONO' 1; letter-spacing: .14em; color: var(--hot); align-self: flex-end; margin-bottom: 6px; }
 .nav { display: flex; gap: 2px; margin-left: auto; overflow-x: auto; scrollbar-width: none; }
 .nav a { padding: 8px 12px; text-decoration: none; color: var(--ink-2); font-size: .9rem; white-space: nowrap; border-radius: 3px; }

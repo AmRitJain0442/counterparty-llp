@@ -1,5 +1,5 @@
 .live-bench,.provider-room {padding:clamp(26px,5vw,70px) 5%;max-width:1160px;margin:auto;color:#eee6d5}
-.live-bench h1 {font-size:clamp(2.4rem,6vw,4.8rem);letter-spacing:-.055em;margin:.2em 0}
+.live-bench h1 {font-family:var(--display-font);font-weight:800;font-size:clamp(2.4rem,6vw,4.8rem);letter-spacing:-.015em;margin:.2em 0}
 .live-bench p,.provider-room p {color:#b9b09f;line-height:1.6}
 .live-bench small,.provider-room th {font:500 .7rem/1.5 monospace;letter-spacing:.08em;color:#c4bba9}
 .bench-grid {display:grid;grid-template-columns:minmax(230px,.85fr) 1.4fr;gap:clamp(16px,4vw,60px);margin-top:30px}

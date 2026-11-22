@@ -1,12 +1,14 @@
-:root {color-scheme:dark;background:#161510;color:#efe6d0;font-family:"Segoe UI",sans-serif;font-synthesis:none}
+@import './display-font.css';
+
+:root {color-scheme:dark;background:#0d0c0a;color:#efe6d0;font-family:"Segoe UI",sans-serif;font-synthesis:none}
 * {box-sizing:border-box}
 body {margin:0}
 a {color:#ff9879}
 .room-nav {min-height:64px;display:flex;align-items:center;justify-content:space-between;padding:12px clamp(18px,4vw,64px);border-bottom:1px solid #403c31;gap:24px;flex-wrap:wrap}
-.room-brand {display:flex;align-items:center;gap:9px;font-size:21px;font-weight:650;letter-spacing:-.045em;color:#eee6d3;text-decoration:none}
+.room-brand {display:flex;align-items:center;gap:9px;font:800 23px/1.1 var(--display-font);letter-spacing:.015em;color:#eee6d3;text-decoration:none}
 .room-brand img {width:34px}.room-brand em{font:normal .65rem monospace;color:#ec9671;align-self:center}
 .room-nav nav{display:flex;gap:4px;flex-wrap:wrap}
 .room-nav nav a,.return-desk{font:500 .78rem/1.4 monospace;text-decoration:none;padding:8px 10px;color:#c6c0af}
 .room-nav nav a[aria-current=page]{background:#322e24;color:#ffab88;border-radius:3px}.return-desk{color:#ff9770}
-.provider-room {padding-top:54px}.provider-room h2{font-size:clamp(2rem,4vw,3.5rem);letter-spacing:-.055em;margin:0}
+.provider-room {padding-top:54px}.provider-room h2{font-size:clamp(2rem,4vw,3.5rem);font-family:var(--display-font);font-weight:800;letter-spacing:-.015em;margin:0}
 @media(max-width:680px){.room-nav{gap:8px}.room-nav nav{order:2;width:100%}.room-nav nav a{padding:8px 6px}}
