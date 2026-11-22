@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import './council.css'
 
 const roles = [
@@ -13,7 +13,10 @@ const edges = [[0,1],[0,2],[1,3],[2,3],[3,4]]
 
 function observations(record, role) {
   const items = record?.evidence || []
-  if (role === 'counsel') return [{label:'Finding after challenge',detail:record?.summary}]
+  if (role === 'counsel') return [
+    ...(record?.reviews?.counsel ? [{label:record.reviews.counsel.name,detail:record.reviews.counsel.detail}] : []),
+    {label:'Rule-based finding',detail:record?.summary}
+  ]
   if (role === 'partner') return [{label:record?.verdict,detail:record?.draft || record?.summary}]
   if (role === 'identity') return items.filter(e => /identit|identify|matched company|resolution/i.test(e.label))
   if (role === 'people') return items.filter(e => /crustdata|employment|headcount|profile|workforce/i.test(e.source + ' ' + e.label))

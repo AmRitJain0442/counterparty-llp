@@ -1,6 +1,7 @@
 """Counterparty LLP single-origin application."""
 import asyncio
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -131,12 +132,23 @@ def investigate(intake: Intake):
         "credits": raw["credits"],
     }
     if intake.mode == "live":
-        progress.report("Gemini drafting counsel", "running", "Preparing the reviewer handoff on Vertex AI")
-        note, status = draft_note(intake.desk, case["evidence"], case["verdict"])
-        case["steps"].append({"name": "Gemini drafting counsel", "status": status,
-                              "detail": note or "Vertex AI draft unavailable for this case."})
-        if note:
-            case["draft"] = note
+        agents = {"analyst": "Gemini evidence analyst", "counsel": "Gemini opposing counsel"}
+        reviews = {}
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            futures = {}
+            for role, name in agents.items():
+                progress.report(name, "running", "Reviewing minimized evidence on Vertex AI")
+                futures[workers.submit(draft_note, intake.desk, case["evidence"], case["verdict"], role)] = role
+            for future in as_completed(futures):
+                role = futures[future]
+                note, status = future.result()
+                progress.report(agents[role], status, "Reviewer handoff complete" if note else "Draft unavailable")
+                reviews[role] = {"name": agents[role], "status": status,
+                                 "detail": note or "Vertex AI draft unavailable for this case."}
+                if note and role == "analyst":
+                    case["draft"] = note
+        case["reviews"] = reviews
+        case["steps"].extend(reviews[role] for role in agents)
     progress.report("Ledger", "running", "Committing the evidence receipt")
     receipt = create_receipt(case)
     case["receipt_record"] = receipt
