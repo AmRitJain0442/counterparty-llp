@@ -8,9 +8,8 @@ const W = 760
 const COL = { input: 6, source: 252, review: 520, verdict: 654 }
 const NODE_W = { input: 184, source: 196, review: 100, verdict: 100 }
 
-export default function FlowDiagram({ desk, values, mode }) {
-  const live = mode === 'live'
-  const filled = key => live && !!(values[key] || '').trim()
+export default function FlowDiagram({ desk, values }) {
+  const filled = key => !!(values[key] || '').trim()
   const rowGap = 64
   const rows = Math.max(desk.fields.length, desk.sources.length)
   const H = Math.max(rows * rowGap, desk.verdicts.length * rowGap) + 28
@@ -62,8 +61,8 @@ export default function FlowDiagram({ desk, values, mode }) {
       {desk.verdicts.map((v, i) => (
         <g key={v} transform={`translate(${COL.verdict} ${fy(i, desk.verdicts.length) - 20})`} className="node verdict">
           <rect width={NODE_W.verdict} height="40" rx="3" />
-          <text x="10" y={v.length > 12 ? 17 : 24} className="n-verdict">{v.length > 12 ? 'REQUEST FOR' : v}</text>
-          {v.length > 12 && <text x="10" y="30" className="n-verdict">EXPLANATION</text>}
+          <text x="10" y={v.length > 12 ? 17 : 24} className="n-verdict">{v.length > 12 ? v.slice(0, v.lastIndexOf(' ')) : v}</text>
+          {v.length > 12 && <text x="10" y="30" className="n-verdict">{v.slice(v.lastIndexOf(' ') + 1)}</text>}
         </g>
       ))}
     </svg>

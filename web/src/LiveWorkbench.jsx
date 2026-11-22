@@ -6,7 +6,7 @@ const fields = {
   payment:[['domain','Vendor domain'],['sender_domain','Sending domain'],['person_url','Consented profile URL'],['orgnr','Vendor registry number (Norway)'],['ifsc','New bank IFSC']],
   candidate:[['person_url','Candidate profile URL'],['domain','Claimed employer domain'],['claim','Employment claim']],
   estate:[['domain','Company domain'],['orgnr','Norwegian registry number']],
-  company:[['domain','Company domain'],['cik','SEC CIK'],['claim','Question to investigate']],
+  company:[['domain','Company domain'],['cik','SEC CIK'],['lei','Legal entity identifier'],['claim','Question to investigate']],
 }
 
 export default function LiveWorkbench({startDesk='estate'}) {

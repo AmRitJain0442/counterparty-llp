@@ -11,7 +11,7 @@ const W = 1260, H = 420, CY = 210
 const ROWS = [70, 163, 257, 350]
 const X = { start: 40, spine: [290, 360], witness: 560, counsel: [790, 850], end: 1058 }
 const WITNESS = [['Crustdata', 'RDAP · IFSC'], ['Crustdata', 'colleagues'], ['Brønnøysund', 'Crustdata'], ['EDGAR 8-K', 'Crustdata']]
-const TERMINAL = [['HELD', 'RELEASED'], ['FAILED', 'VERIFIED'], ['REQUEST FOR EXPLANATION', 'KILLED'], ['SIGNED', 'FORECAST']]
+const TERMINAL = DESKS.map(desk => desk.verdicts)
 
 function route(i) {
   const ry = ROWS[i]

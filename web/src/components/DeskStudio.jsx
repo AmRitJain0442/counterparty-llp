@@ -6,7 +6,6 @@ import './studio.css'
 
 export default function DeskStudio({ deskId, onDeskChange, onFiled }) {
   const desk = DESK_BY_ID[deskId]
-  const mode = 'live'
   const [subjects, setSubjects] = useState({})
   const [inputs, setInputs] = useState({})
   const [consents, setConsents] = useState({})
@@ -43,7 +42,7 @@ export default function DeskStudio({ deskId, onDeskChange, onFiled }) {
     try {
       const cleaned = Object.fromEntries(Object.entries(values).map(([k, v]) => [k, (v || '').trim()]).filter(([, v]) => v))
       const intake = {
-        desk: deskId, mode, subject: subject.trim(), consent: needsConsent ? consent : false, inputs: cleaned,
+        desk: deskId, mode: 'live', subject: subject.trim(), consent: needsConsent ? consent : false, inputs: cleaned,
       }
       const filed = await streamCase(intake, event => setActivity(items => ({ ...items, [event.name]: event.status })), abort.current.signal)
       onFiled(filed)
@@ -115,7 +114,7 @@ export default function DeskStudio({ deskId, onDeskChange, onFiled }) {
             <span className="fine">Fields light up as you fill them. Nothing is sent until you open the case.</span>
           </div>
           <div className="flow-scroll" tabIndex={0} role="group" aria-label="Data flow diagram, scrolls sideways on small screens">
-            <FlowDiagram desk={desk} values={values} mode={mode} />
+            <FlowDiagram desk={desk} values={values} />
           </div>
           {busy && Object.keys(activity).length > 0 && <div className="live-feed" aria-label="Live collection events">
             {Object.entries(activity).map(([name,status]) => <div key={name}><span>{name.replaceAll('_',' ')}</span><b>{status}</b></div>)}
