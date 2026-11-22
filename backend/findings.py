@@ -5,6 +5,7 @@ dates a card. A filing date, role start or headcount point dates an observation.
 """
 import json
 import re
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 
 from .estate import MIN_COVERAGE, MIN_GROUP, Period, _credits, _day, _domain, _history, _identity, _role_date
@@ -244,7 +245,7 @@ def _next_start(roles, cid, domains, cutoff):
     vendor = [r for r in roles if _employer(r, cid, domains) == cid]
     if not vendor or any(r.current or not r.end or r.end.last > cutoff for r in vendor):
         return None
-    end = max(r.end for r in vendor)
+    end = Period(max(r.end.first for r in vendor), max(r.end.last for r in vendor))
     # An overlapping, undated or ambiguous intervening role breaks the sequence.
     after = [r for r in roles if r not in vendor and (not r.end or r.end.last >= end.first)
              and (not r.start or r.start.first <= cutoff)]
@@ -304,7 +305,7 @@ def _bank(review, inputs):
     for key, label in (("BANK", "Bank"), ("CITY", "City")):
         value = data.get(key)
         if isinstance(value, str) and re.fullmatch(r"[^\W\d_][\w .,&'()-]{0,80}", value):
-            detail += f" {label}: {value}."
+            detail += f" {label} listed as {value}."
     review.card(row, "Bank branch lookup", detail + " Account ownership requires independent confirmation.")
 
 
@@ -329,6 +330,205 @@ def _payment(review, inputs, cid, domains, consent):
         card.update(observed_from=str(start.first), observed_through=str(start.last))
 
 
+@dataclass(frozen=True)
+class _Claim:
+    window: Period | None
+    headcount: int | None
+    department: str | None
+
+
+ISO_PART = r"[0-9]{4}(?:-[0-9]{2}(?:-[0-9]{2})?)?"
+DATE_RANGE = re.compile(rf"\b({ISO_PART})\s*(?:to|through|until|[-–—])\s*({ISO_PART})\b", re.I)
+TEAM = re.compile(r"\b(?:led|managed|supervised|headed)\s+(?:a\s+team\s+of\s+)?([0-9]+)\s+"
+                  r"(engineers?|finance staff|employees?|people|staff|direct reports?)\b", re.I)
+FUNCTIONS = {"engineering": "Engineering", "engineer": "Engineering", "engineers": "Engineering",
+             "finance": "Finance", "finance staff": "Finance", "sales": "Sales", "marketing": "Marketing",
+             "operations": "Operations", "product management": "Product Management"}
+
+
+def _candidate_claim(inputs):
+    """Accept structured claim fields or the date range and team size in the intake text."""
+    claim = inputs.get("claim", "")
+    if isinstance(claim, str) and claim.lstrip().startswith("{"):
+        try:
+            claim = json.loads(claim)
+        except (ValueError, RecursionError):
+            return None
+    fields = _dict(claim)
+    start = inputs.get("claim_start", fields.get("start_date"))
+    end = inputs.get("claim_end", fields.get("end_date"))
+    count = inputs.get("claim_headcount", fields.get("headcount"))
+    department = inputs.get("claim_department", fields.get("department"))
+    if isinstance(claim, str):
+        ranges = DATE_RANGE.findall(claim)
+        teams = TEAM.findall(claim)
+        if len(ranges) > 1 or len(teams) > 1:
+            return None
+        if ranges and start is None and end is None:
+            start, end = ranges[0]
+        if teams and count is None:
+            count, department = teams[0]
+        if start is None and end is None:
+            quarter = re.search(r"\bQ([1-4])\s+([0-9]{4})\b", claim, re.I)
+            if quarter:
+                last_month = 3 * int(quarter[1])
+                start, end = f"{quarter[2]}-{last_month - 2:02}", f"{quarter[2]}-{last_month:02}"
+    window = None
+    if start is not None or end is not None:
+        first, _ = _role_date(start if start is not None else end)
+        last, _ = _role_date(end if end is not None else start)
+        if not first or not last or first.first > last.last:
+            return None
+        window = Period(first.first, last.last)
+    if count is not None:
+        if not re.fullmatch(r"[0-9]{1,8}", str(count)):
+            return None
+        count = int(count)
+    group = _name(department)
+    if group and group not in FUNCTIONS and group not in {
+        "employee", "employees", "people", "staff", "direct report", "direct reports", "total"
+    }:
+        return None
+    return _Claim(window, count, FUNCTIONS.get(group))
+
+
+def _ranges(roles, cid, domains, cutoff):
+    """Guaranteed overlap uses the latest possible start and earliest possible end."""
+    spans = []
+    for role in roles:
+        if _employer(role, cid, domains) != cid or not role.start:
+            continue
+        end = role.end or role.start  # An open role supplies only its dated start.
+        if role.start.last <= end.first <= end.last <= cutoff:
+            spans.append(Period(role.start.last, end.first))
+    merged = []
+    for span in sorted(spans):
+        if merged and (span.first - merged[-1].last).days <= 1:
+            merged[-1] = Period(merged[-1].first, max(span.last, merged[-1].last))
+        else:
+            merged.append(span)
+    return merged
+
+
+def _intersects(a, b):
+    return max(a.first, b.first) <= min(a.last, b.last)
+
+
+def _employment_dates(review, reference, claim):
+    if not reference:
+        review.step("Claimed employment dates", "unknown", "No dated role at the matched employer could be compared.")
+        return []
+    if not claim.window:
+        detail = f"The profile records employment at the matched company on {_period_text(reference[-1])}."
+        review.card(review.one("person_enrich"), "Dated employment", detail)
+        return reference
+    window = claim.window
+    overlap = [Period(max(s.first, window.first), min(s.last, window.last)) for s in reference if _intersects(s, window)]
+    prefix = f"The claim covers {_period_text(window)}. "
+    if window in overlap:
+        detail = prefix + "The dated role history covers the claimed period."
+    elif overlap:
+        detail = prefix + f"The dated role history overlaps part of the claim, including {_period_text(overlap[-1])}."
+    else:
+        closest = min(reference, key=lambda s: max(window.first - s.last, s.first - window.last))
+        detail = prefix + f"No documented overlap. The closest recorded interval is {_period_text(closest)}."
+    review.card(review.one("person_enrich"), "Claimed employment dates", detail)
+    return overlap
+
+
+def _colleagues(review, target, reference, cid, domains):
+    rows = review.rows.get("person_search", [])
+    pid = target.get("crustdata_person_id")
+    if not reference or not rows or type(pid) is not int or pid <= 0:
+        return
+    peers = {}
+    for row in rows:
+        cutoff = _day(row.get("as_of"))
+        if not cutoff:
+            continue
+        for peer in _list(_dict(row.get("data")).get("profiles")):
+            peer = _dict(peer)
+            other = peer.get("crustdata_person_id")
+            if type(other) is not int or other <= 0 or other == pid:
+                continue
+            roles, _ = _history(peer)
+            if not any(_employer(r, cid, domains) == cid for r in roles):
+                continue
+            refreshed = _day(peer.get("updated_at"))
+            spans = _ranges(roles, cid, domains, min(cutoff, refreshed) if refreshed else cutoff)
+            if other in peers and spans != peers[other]:
+                peers[other] = []  # Conflicting duplicate profiles supply no overlap.
+            else:
+                peers[other] = spans
+    count = sum(any(_intersects(a, b) for a in spans for b in reference) for spans in peers.values())
+    if len(peers) < MIN_COVERAGE or count < MIN_GROUP:
+        review.step("Colleague overlap", "insufficient_coverage", "Insufficient dated peer coverage to publish an aggregate.")
+        return
+    review.card(rows[-1], "Colleague overlap",
+                f"{count} distinct colleagues in the returned sample overlap the matched profile at this employer "
+                "within the reviewed dates. These records share one provider.")
+
+
+def _headcounts(company, department, cutoff):
+    """Return actual dated estimates for one population, excluding conflicting points."""
+    headcount = _dict(company.get("headcount"))
+    series = headcount.get("timeseries")
+    current = headcount.get("total")
+    if department:
+        functions = _dict(_dict(headcount.get("by_function_timeseries")).get("CURRENT_FUNCTION"))
+        series = next((v for k, v in functions.items() if _name(k) == _name(department)), None)
+        current = next((v for k, v in _dict(headcount.get("by_role_absolute")).items()
+                        if _name(k) == _name(department)), None)
+    points = {}
+    for point in [*_list(series), {"date": company.get("updated_at"), "employee_count": current}]:
+        day = _day(_dict(point).get("date"))
+        size = _dict(point).get("employee_count")
+        if cutoff and day and day <= cutoff and type(size) is int and size >= 0:
+            points.setdefault(day, set()).add(size)
+    return sorted((d, next(iter(s))) for d, s in points.items() if len(s) == 1)
+
+
+def _claim_headcount(review, company, claim):
+    row = review.one("company_enrich")
+    population = claim.department or "whole-company"
+    count = claim.headcount
+    claimed = str(count) if count >= MIN_GROUP else "fewer than five"
+    detail = f"The claim lists {claimed} staff. "
+    candidates = _headcounts(company, claim.department, _day(row.get("as_of")))
+    if claim.window:
+        candidates = [(d, s) for d, s in candidates if claim.window.first <= d <= claim.window.last]
+    if not candidates or candidates[-1][1] < MIN_GROUP:
+        review.step("Claimed headcount", "unknown", detail + f"No publishable dated {population} estimate for comparison.")
+        return
+    day, size = candidates[-1]
+    detail += f"The {population} estimate on {day} was {size} profiles. "
+    if claim.window:
+        relation = "below" if size < count else "at or above"
+        detail += f"At this point in the claimed period, the estimate was {relation} the claimed size."
+    else:
+        detail += "The claim needs a date to establish whether the periods match."
+    review.card(row, "Claimed headcount", detail + " Reporting lines require separate evidence.", observed=day)
+
+
+def _candidate(review, inputs, cid, domains, company, consent):
+    if not consent or not cid:
+        return
+    claim = _candidate_claim(inputs)
+    if claim is None:
+        review.step("Candidate claim", "unknown", "The claim has invalid or ambiguous dates, team size or function.")
+        return
+    if claim.headcount is not None:
+        _claim_headcount(review, company, claim)
+    person, cutoff, _ = _person(review, inputs)
+    if not person or not cutoff:
+        return
+    roles, _ = _history(person)
+    dates = _employment_dates(review, _ranges(roles, cid, domains, cutoff), claim)
+    _colleagues(review, person, dates, cid, domains)
+    if not claim.window and claim.headcount is None:
+        review.step("Candidate claim", "unknown", "A reviewer needs a dated or quantitative claim to compare.")
+
+
 def interpret(desk, subject, inputs, raw):
     """Project one run_live response (or its joined lanes) into ledger-safe findings."""
     inputs, raw = _dict(inputs), _dict(raw)
@@ -342,6 +542,8 @@ def interpret(desk, subject, inputs, raw):
         review.step("Profile consent", "skipped", "Profile evidence requires consent.")
     if desk == "payment":
         _payment(review, inputs, cid, domains, consent)
+    elif desk == "candidate":
+        _candidate(review, inputs, cid, domains, company, consent)
     charges = [_credits(_dict(c).get("actual")) for c in _list(raw.get("credits"))]
     return dict(evidence=review.evidence, signals=review.signals, steps=review.steps, flows=[],
                 credits=float(sum(charges)) if charges and all(c is not None for c in charges) else None)

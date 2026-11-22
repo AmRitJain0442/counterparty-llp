@@ -163,3 +163,87 @@ def test_missing_permission_suppresses_person_evidence_even_with_company_data():
 def test_missing_or_mismatched_registration_is_not_domain_age(domain, registered):
     result = run("payment", company(), rdap(domain, registered), inputs=PAY)
     assert all(e["label"] != "Domain registration" for e in result["evidence"])
+
+
+def engineering_counts():
+    return company("company_enrich", updated_at="2026-10-10", headcount={
+        "by_function_timeseries": {
+            "CURRENT_FUNCTION": {"Engineering": [
+                {"date": "2023-09-30", "employee_count": 11}, {"date": "2020-09-30", "employee_count": 58}]},
+            "GEO_REGION": {"Engineering": [{"date": "2023-09-30", "employee_count": 744}]},
+        }, "by_role_absolute": {"Engineering": 120}, "total": 865,
+    })
+
+
+@pytest.mark.parametrize("claim", [
+    "Led 40 engineers, 2023 to 2025",
+    {"start_date": "2023", "end_date": "2025", "department": "Engineering", "headcount": 40},
+    json.dumps({"start_date": "2023", "end_date": "2025", "department": "Engineering", "headcount": 40}),
+])
+def test_candidate_compares_claim_at_the_requested_dates_and_function(claim):
+    result = run("candidate", company(), person(profile(81, [VENDOR])), engineering_counts(),
+                 inputs={**INPUTS, "claim": claim}, subject="Candidate")
+    counts = card(result, "Claimed headcount")
+    assert counts["observed_on"] == "2023-09-30"
+    assert all(term in counts["detail"] for term in ("40", "11", "Engineering", "below"))
+    assert all(term not in counts["detail"] for term in ("865", "120", "744"))
+    assert "covers the claimed period" in card(result, "Claimed employment dates")["detail"]
+    assert "verdict" not in result
+    assert PRIVATE not in json.dumps(result)
+
+
+def test_changing_only_the_claim_changes_both_comparisons():
+    records = (company(), person(profile(81, [role(21, "2023-01-01", "2024-01-01")])), engineering_counts())
+    newer = run("candidate", *records, inputs={**INPUTS, "claim": "Led 40 engineers in Q3 2023"})
+    older = run("candidate", *records, inputs={**INPUTS, "claim_start": "2020", "claim_end": "2020",
+                                               "claim_headcount": "25", "claim_department": "Engineering"})
+    assert "covers the claimed period" in card(newer, "Claimed employment dates")["detail"]
+    assert "No documented overlap" in card(older, "Claimed employment dates")["detail"]
+    assert "below" in card(newer, "Claimed headcount")["detail"]
+    assert "at or above" in card(older, "Claimed headcount")["detail"]
+    assert card(older, "Claimed headcount")["observed_on"] == "2020-09-30"
+
+
+def test_current_headcount_cannot_supply_a_historical_estimate():
+    result = run("candidate", company(), engineering_counts(), inputs={**INPUTS, "claim": "Led 40 engineers in Q1 2021"})
+    assert all(e["label"] != "Claimed headcount" for e in result["evidence"])
+    assert any(s["name"] == "Claimed headcount" and "40" in s["detail"] for s in result["steps"])
+
+
+def test_undated_team_claim_compares_scope_without_assuming_a_quarter():
+    result = run("candidate", company(), engineering_counts(), inputs={**INPUTS, "claim": "Managed 60 engineers"})
+    detail = card(result, "Claimed headcount")["detail"]
+    assert "60" in detail and "120" in detail and "needs a date" in detail
+    assert "below" not in detail
+
+
+def test_identity_mismatch_between_identify_and_enrich_excludes_headcount():
+    conflicting = engineering_counts()
+    conflicting["data"][0]["matches"][0]["company_data"]["crustdata_company_id"] = 525
+    result = run("candidate", company(), conflicting, inputs={**INPUTS, "claim": "Led 40 engineers in Q3 2023"})
+    assert all(e["label"] != "Claimed headcount" for e in result["evidence"])
+    assert any(s["name"] == "Company enrichment identity" for s in result["steps"])
+
+
+def test_peer_aggregation_requires_distinct_other_people_in_claimed_period():
+    # All 15 colleagues overlap the full employment history, only five in 2023.
+    target = profile(81, [VENDOR])
+    in_window = [profile(i + 100, [role(21, "2023-03-01", "2023-08-01")]) for i in range(5)]
+    early = [profile(i + 200, [role(21, "2021-01-01", "2021-12-31")]) for i in range(10)]
+    title = "Colleague overlap"
+    candidates = [target, *in_window, *early, in_window[0], profile(501, [role(999, "2023-01-01", "2023-11-01")])]
+    peers = row("person_search", {"profiles": candidates, "total_count": 100_000})
+    result = run("candidate", company(), peers, person(target), inputs={**INPUTS, "claim": "2023 to 2023"})
+    assert card(result, title)["detail"].startswith("5 distinct")
+    peers["data"]["profiles"] = [target, *in_window[:4], *early, early[0], in_window[0]]
+    thin = run("candidate", company(), peers, person(target), inputs={**INPUTS, "claim": "2023 to 2023"})
+    assert all(e["label"] != title for e in thin["evidence"])
+    assert any(s["name"] == title and s["status"] == "insufficient_coverage" for s in thin["steps"])
+
+
+def test_open_role_does_not_extend_to_a_later_claim_or_peer():
+    target = profile(81, [], [role(21, "2018-01-01")])
+    peers = row("person_search", {"profiles": [profile(i + 100, [VENDOR]) for i in range(18)]})
+    result = run("candidate", person(target), company(), peers, inputs={**INPUTS, "claim": "2024 to 2025"})
+    assert "No documented overlap" in card(result, "Claimed employment dates")["detail"]
+    assert all(e["label"] != "Colleague overlap" for e in result["evidence"])
