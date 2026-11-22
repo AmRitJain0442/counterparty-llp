@@ -4,7 +4,7 @@
 
 **[Open the workspace](https://counterparty-939419364980.asia-south1.run.app/)** · **[Replay a completed investigation](https://counterparty-939419364980.asia-south1.run.app/?case=c4b983b065f7413daaf908c9ab06f9a6#swarm)** · [Run locally](#run-locally)
 
-[Buyer pitch, feature guide and live API status](docs/sales-guide.md)
+[Investor pitch](docs/investor-pitch.md) · [Buyer pitch, feature guide and live API status](docs/sales-guide.md)
 
 The replay opens a real company investigation without spending provider credits. Select **Scope analyst** on the map to see what its two specialists checked and which evidence they cited.
 
