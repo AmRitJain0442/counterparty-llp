@@ -144,7 +144,7 @@ export default function DeskStudio({ deskId, onDeskChange, onFiled }) {
             <div><dt>Replaces</dt><dd>{desk.replaces}</dd></div>
             <div><dt>Human fee</dt><dd>{desk.fee}</dd></div>
             <div><dt>{mode === 'demo' ? 'Demo cost' : 'Crustdata estimate'}</dt><dd>{mode === 'demo' ? 0 : desk.credits} credits</dd></div>
-            {mode === 'live' && <div><dt>Gemini analysis</dt><dd>Up to 29 reviews on Vertex AI</dd></div>}
+            {mode === 'live' && <div><dt>Gemini analysis</dt><dd>Up to 28 reviews on Vertex AI</dd></div>}
           </dl>
         </div>
       </div>

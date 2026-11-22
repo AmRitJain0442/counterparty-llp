@@ -171,7 +171,7 @@ export default function Inspector({
             </label>
           )}
 
-          {live && <p className="insp-note">Estimated collection cost: {spec.credits} Crustdata credits. Analysis uses up to 29 Gemini reviews on Vertex AI.</p>}
+          {live && <p className="insp-note">Estimated collection cost: {spec.credits} Crustdata credits. Analysis uses up to 28 Gemini reviews on Vertex AI.</p>}
           <button type="submit" className="insp-run" disabled={running || missing}>
             {running ? 'Collecting evidence…' : live ? `Open a live ${spec.name} case` : `Run the ${spec.name} demo`}
           </button>

@@ -49,8 +49,8 @@ def test_live_parallel_fanout_and_context(monkeypatch):
     monkeypatch.setattr(swarm, 'draft_note', note)
     reports = swarm.run_council('payment', ROWS, 'HELD', lambda e: None, 'live',
                                 verdict_summary='The independent records agree.', proposition='Vendor domain')
-    assert len(calls) == 29
-    assert len(specialists) == 24
+    assert len(calls) == 28
+    assert len(specialists) == 23
     assert all(r['status'] == 'complete' for r in reports)
     partner = next(c for c in calls if any(r.get('label') == 'Dependency challenger_scope' for r in c) and any(r.get('label') == 'Bounded assignment' for r in c))
     assert {r['label'] for r in partner} >= {'Dependency challenger_scope', 'Dependency challenger_timing'}
@@ -61,7 +61,8 @@ def test_live_missing_vertex_is_honest(monkeypatch):
     reports = {r['agent_id']: r for r in swarm.run_council('payment', ROWS, 'HELD', lambda e: None, 'live')}
     children = [r for r in reports.values() if r['parent_id']]
     assert len(children) == 24
-    assert all(r['status'] == 'unavailable' and not r['refs'] for r in children)
+    assert reports['dates.sequence']['status'] == 'complete'
+    assert all(r['status'] == 'unavailable' and not r['refs'] for r in children if r['agent_id'] != 'dates.sequence')
     assert reports['analyst_scope']['status'] == 'blocked'
     assert reports['partner']['status'] == 'blocked'
     assert reports['authority']['status'] == 'complete'

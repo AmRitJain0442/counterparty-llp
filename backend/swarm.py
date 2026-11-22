@@ -4,7 +4,7 @@ Notes are advisory; the supplied deterministic verdict is never recomputed.
 """
 from concurrent.futures import ThreadPoolExecutor
 from .drafting import draft_note
-from .personas import PARENT_PERSONAS, SPECIALISTS, demo_specialist
+from .personas import PARENT_PERSONAS, SPECIALISTS, check_specialist
 from threading import RLock
 
 
@@ -152,8 +152,8 @@ def run_council(desk, evidence, verdict, emit, mode, *, verdict_summary='', prop
         event('start', agent, detail=agent['task'], status='running')
         try:
             upstream = [reports[d] for d in agent['depends_on']]
-            if replay:
-                review = demo_specialist(spec, rows, upstream, verdict)
+            if replay or agent['id'] == 'dates.sequence':
+                review = check_specialist(spec, rows, upstream, verdict)
                 status = 'complete'
             else:
                 dependencies = [dict(label=f"Dependency {r['agent_id']}",

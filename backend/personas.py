@@ -1,7 +1,7 @@
 """Analytical personas for the council and a local evidence check per specialist.
 
 Persona and task strings are prompt material for the live Gemini path. Nothing here
-calls a model: ``demo_specialist`` is a deterministic rehearsal that inspects only
+calls a model: ``check_specialist`` runs deterministic checks on
 the display-safe evidence rows it is given and cites only ids found in those rows.
 """
 import re
@@ -366,16 +366,22 @@ def _dates_recency(rows, up, verdict):
 
 
 def _dates_sequence(rows, up, verdict):
-    bad, checked = [], []
+    bad, checked, unknown = [], [], []
     for r in _material(rows):
         seen = _asof(r)
         for d in _isodates(r.get('detail', '')):
-            checked.append(r)
-            if d is None or (seen and d > seen):
+            if d is None or seen is None:
+                unknown.append(r)
+            elif d > seen:
                 bad.append(r)
+            else:
+                checked.append(r)
     if bad:
-        return (f'Impossible or future-dated text in {_short(_ids(bad))}: cited date is malformed or later than '
-                'the observation date.', 'needs_evidence', _ids(bad))
+        return (f'A cited date is later than the observation date in {_short(_ids(bad))}. '
+                'Check whether the source describes a planned event or a historical one.', 'needs_evidence', _ids(bad))
+    if unknown:
+        return (f'The cited and observation dates could not both be parsed in {_short(_ids(unknown))}. '
+                'Check the original date fields.', 'needs_evidence', _ids(unknown))
     if checked:
         return (f'{len(checked)} date(s) cited inside exhibit text in {_short(_ids(checked))}; none is later than '
                 'its observation date.', 'ready', _ids(checked))
@@ -732,7 +738,7 @@ _GATED = {'scope', 'timing', 'challenge', 'partner'}
 _CAVEAT = _GATED - {'partner'}
 
 
-def demo_specialist(spec, rows, upstream, verdict):
+def check_specialist(spec, rows, upstream, verdict):
     """Run the deterministic local check for one specialist.
 
     Returns ``{note, assessment, refs}``. Refs are always ids present in ``rows``;

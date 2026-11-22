@@ -74,7 +74,7 @@ def test_review_keeps_original_commitment_valid(client):
 def test_live_challenge_can_refer_a_proposed_finding(client, monkeypatch, assessment, expected):
     from backend import swarm
     monkeypatch.setattr(main, "collect_live", lambda *args: {
-        "subject": "Example", "evidence": [{"id":"card", "label":"Filing", "detail":"Dated filing", "source":"Registry"}],
+        "subject": "Example", "evidence": [{"id":"card", "label":"Filing", "detail":"Filed on 2026-11-02.", "as_of":"2026-11-22", "source":"Registry"}],
         "steps": [], "flows": [], "credits": 0,
     })
     monkeypatch.setattr(main, "adjudicate", lambda *a: {"verdict":"FORECAST FOR REVIEW", "summary":"Reviewable finding"})
@@ -94,7 +94,8 @@ def test_live_challenge_can_refer_a_proposed_finding(client, monkeypatch, assess
 def test_specialist_concern_reaches_the_filed_decision(client, monkeypatch):
     from backend import swarm
 
-    evidence = [{"id": "filing", "source": "Registry", "label": "Dated filing", "detail": "Two entities share a name."}]
+    evidence = [{"id": "filing", "source": "Registry", "label": "Dated filing", "as_of": "2026-11-22",
+                 "detail": "Two entities shared a name on 2026-11-02."}]
     monkeypatch.setattr(main, "collect_live", lambda *args: dict(evidence=evidence, steps=[], flows=[], credits=0))
     monkeypatch.setattr(main, "adjudicate", lambda *args: dict(verdict="FORECAST FOR REVIEW", summary="Proposed forecast"))
     specialist = next(a for a in swarm.agents_for("company") if a["parent_id"] == "identity")
