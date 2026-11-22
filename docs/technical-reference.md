@@ -19,7 +19,7 @@ The Windows launcher can read a DPAPI-protected Crustdata token and an ADC path 
 
 | Method | Route | Result |
 | --- | --- | --- |
-| POST | `/api/cases` | File a demo or live investigation |
+| POST | `/api/cases` | File a live investigation. The optional `mode` field accepts only `live`. |
 | POST | `/api/cases/stream` | Stream progress as newline-delimited JSON, followed by the filed case |
 | GET | `/api/swarms/{desk}` | Lead and specialist personas, assignments, ownership and dependencies |
 | GET | `/api/cases` | Shared ledger in reverse creation order |

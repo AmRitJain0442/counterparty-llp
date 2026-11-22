@@ -4,7 +4,7 @@
 
 **[Open the workspace](https://counterparty-939419364980.asia-south1.run.app/)** · **[Replay a completed investigation](https://counterparty-939419364980.asia-south1.run.app/?case=c4b983b065f7413daaf908c9ab06f9a6#swarm)** · [Run locally](#run-locally)
 
-[Buyer demo script, feature guide and live API status](docs/sales-demo.md)
+[Buyer pitch, feature guide and live API status](docs/sales-guide.md)
 
 The replay opens a real company investigation without spending provider credits. Select **Scope analyst** on the map to see what its two specialists checked and which evidence they cited.
 
@@ -57,7 +57,7 @@ npm --prefix web run build
 .venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8080
 ```
 
-Open [localhost:8080](http://127.0.0.1:8080) and choose **Run → Demo** for a curated investigation with no credentials or provider charges. **Live** uses a server-side Crustdata account and Gemini on Vertex AI. A fully executed live case runs 28 Gemini reviews. The date plausibility specialist uses calendar arithmetic. Candidate investigations require consent, and cases filed on the hosted app enter its shared ledger.
+Configure your server-side Crustdata and Vertex AI credentials, then open [localhost:8080](http://127.0.0.1:8080). Choose a desk, enter the subject and start the investigation. Every submission runs live and can incur provider charges. Opening a filed trace reads the saved evidence. A fully executed live case runs 28 Gemini reviews. The date plausibility specialist uses calendar arithmetic. Candidate investigations require consent, and cases filed on the hosted app enter its shared ledger.
 
 ## ![Technical reference](docs/brand/technical-reference.svg)
 

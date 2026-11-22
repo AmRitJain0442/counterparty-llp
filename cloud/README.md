@@ -98,7 +98,7 @@ Grant the intended staff group `roles/run.invoker` on the case service. For a na
    python -m backend.watch bind "$WATCH_ID" "$CASE_ID"
    ```
 
-5. Use the provider's test-delivery action to confirm signature and routing. A test or free baseline returns `{"status":"ignored"}`. A changed record queues an opaque event ID. The authenticated subscriber acknowledges with 204 after committing the review. Re-read the case to see `watch_review.status`, its count and the delivery time. Keep rehearsal events labelled `REPLAY` in the demo.
+5. Use the provider's test-delivery action to confirm signature and routing. A test or free baseline returns `{"status":"ignored"}`. A changed record queues an opaque event ID. The authenticated subscriber acknowledges with 204 after committing the review. Re-read the case to see `watch_review.status`, its count and the delivery time.
 
 ### Redelivery and recovery
 

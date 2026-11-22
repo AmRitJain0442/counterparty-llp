@@ -6,6 +6,8 @@ Track fit: **Trust & compliance** (primary), with Buying & paying, Hiring and In
 
 ---
 
+This is the original design brief. The [sales guide](docs/sales-guide.md) describes the shipped live workflows and verified provider coverage.
+
 ## 1. The problem and the fee we replace
 
 Every service firm in finance, insurance and compliance is paid to answer one question:
@@ -77,7 +79,7 @@ Desk #1 and desk #2 are also written up as standalone projects in `02_COLLEAGUE_
 2. **People desk.** `/person/enrich` returns `experience[]` with start and end dates. `/person/search` finds colleagues whose dates overlapped and everyone who ever worked at a given company. `/batch/person/verify` checks CV claims, with consent.
 3. **Company desk.** `/company/enrich` with the `headcount`, `people`, `hiring`, `funding` and `news` groups. `/company/search` for peer baselines. `/job/search` aggregations serve as the "still hiring?" life sign.
 4. **Witness desk.** Independent public sources (see §4).
-5. **Watch desk.** Crustdata `/watch/company` and person watchers on a **30-day SLA**, armed days before the demo (never the 1-day SLA, which costs 150 credits per record). Webhooks go to Cloud Run, then Pub/Sub.
+5. **Watch desk.** Crustdata `/watch/company` and person watchers on a **30-day SLA**, armed days before the presentation (never the 1-day SLA, which costs 150 credits per record). Webhooks go to Cloud Run, then Pub/Sub.
 6. **Adjudication.**
    - Gemini on Vertex AI drafts each finding.
    - An **opposing-counsel agent** attacks it using deterministic rules: a successor or parent company, an acqui-hire, a sample that is too small, or a stale profile.
@@ -124,7 +126,7 @@ Desk #1 and desk #2 are also written up as standalone projects in `02_COLLEAGUE_
 
 ---
 
-## 5. Demo script (~5 minutes)
+## 5. Proposed presentation script (~5 minutes)
 
 **Act 1: The Payment (70 s) → HELD**
 - **Setup:** a judge forwards a seeded "please update our bank details" email that uses a real vendor contact's name.
@@ -146,7 +148,7 @@ Desk #1 and desk #2 are also written up as standalone projects in `02_COLLEAGUE_
 - **Part 1 (live):** **Ruta Entreprenør AS**, 139 employees, went bankrupt on 2026-11-02. The system fetches ruta.no and counts how many former staff still list Ruta and how many have moved on.
 - **Part 2 (cached, labelled CACHED):** an older large bankruptcy shows a **Sankey diagram of where its people went**. The directors of the top destination company are checked against the dead firm's directors.
 - **The hit:** **Balder Bulk Holding AS** appears as a shared-board hit.
-- **The kill:** opposing counsel **KILLS** it. It is the solvent parent company and existed before the bankruptcy. *We demonstrate our own false-positive filter.*
+- **The kill:** opposing counsel **KILLS** it. It is the solvent parent company and existed before the bankruptcy. *We show our own false-positive filter.*
 - **Live calls:** Brønnøysund ×3, `/company/enrich`, `/person/search`, a fetch of ruta.no.
 - **Fee line:** *"The trustee's first forensic review."*
 
@@ -224,7 +226,7 @@ Free public calls add about 12 more. Keep a 2× credit buffer. Night-before cach
 5. Headcount history: stored snapshots or reconstructed? This settles the backtest rule.
 6. `/person/enrich` on a teammate: how fresh are the experience dates?
 7. A dry run of `/batch/person/verify` on one consented CV: check the output format and polling time.
-8. **Arm watchers now** (30-day SLA) so a real log exists by demo day.
+8. **Arm watchers now** (30-day SLA) so a real log exists by presentation day.
 9. Load-test the gateway at 5 RPM. Confirm `X-Credits-Used` reaches the meter.
 
 ---

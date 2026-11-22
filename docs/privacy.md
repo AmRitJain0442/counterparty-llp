@@ -6,6 +6,6 @@ Prefer a registry number, company domain or aggregate movement over individual h
 
 A reviewer opens each witness, checks that the identity, time period and proposition match, and considers an ordinary alternative explanation. A payment hold calls for a callback using an independently held contact. A candidate can correct a date or explain the apparent discrepancy. A company or estate finding requests an explanation. The service performs no payments, rejections, employment actions or legal filings.
 
-Before operational use, designate a reviewer to handle notice, access, correction, objection and deletion requests. Set a case retention period and record who can access the ledger. The local demo stores cases until the operator removes the ledger. Cloud retention and access controls belong to the deploying organization. A public receipt requires separate opt-in because public log entries persist.
+Before operational use, designate a reviewer to handle notice, access, correction, objection and deletion requests. Set a case retention period and record who can access the ledger. The local ledger stores cases until the operator removes the ledger. Cloud retention and access controls belong to the deploying organization. A public receipt requires separate opt-in because public log entries persist.
 
 See the [EU General Data Protection Regulation](https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng), especially Articles 5, 6 and 22.

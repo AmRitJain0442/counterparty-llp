@@ -12,7 +12,7 @@ The supplied Google service account completed a Gemini 2.5 Flash generation on V
 | Balder Bulk Holding AS | Top name-match confidence 0.6. Registry identifies the holding company as 835318222 and the bankrupt operating company as 915644686. | Stop at the identity gate for the ambiguous name. |
 | Isfjord Norway AS | Name match 1.0. Registry 981647459 returned bankrupt and 247 employees. | Available as a second estate subject. |
 
-Historical snapshot retention is unconfirmed. The demo uses labeled reconstructions. Watch evidence in the stage example is a replay. A real callback needs an entitled watch and a reachable authenticated receiver. Re-run the account preflight with `python -m scripts.preflight` after a plan change.
+Historical snapshot retention is unconfirmed. Filed traces retain their original collection dates. A real callback needs an entitled watch and a reachable authenticated receiver. Re-run the account preflight with `python -m scripts.preflight` after a plan change.
 
 
 The watch index accepted the supplied key even though the account price card omitted watch routes. Created Ruta company watch 57486 for a headcount change, with a weekly trigger, 30-day data refresh and expiry on 2027-01-21. Its baseline run 615752 succeeded on 2026-11-22 at zero credits. It is configured for pull-based history. No notification destination was registered. Set CRUSTDATA_WATCH_ID to show its real counters at /api/watch.
