@@ -11,10 +11,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .adjudication import adjudicate
 from .demo import build_demo
+from .drafting import draft_note
+from .receipts import create_receipt
+from .watch import router as watch_router
 from .live import collect_live
 from .storage import get_case, list_cases, save_case
 
 app = FastAPI(title="Counterparty LLP", version="0.1.0")
+app.include_router(watch_router)
 WEB = Path(__file__).resolve().parents[1] / "web" / "dist"
 
 
@@ -94,10 +98,15 @@ def investigate(intake: Intake):
         "flows": raw["flows"],
         "credits": raw["credits"],
     }
-    if raw.get("draft"):
-        case["draft"] = raw["draft"]
-    from .receipts import case_receipt
-    case["receipt"] = case_receipt(case)
+    if intake.mode == "live":
+        note, status = draft_note(intake.desk, case["evidence"], case["verdict"])
+        case["steps"].append({"name": "Gemini drafting counsel", "status": status,
+                              "detail": note or "Vertex AI draft unavailable for this case."})
+        if note:
+            case["draft"] = note
+    receipt = create_receipt(case)
+    case["receipt_record"] = receipt
+    case["receipt"] = receipt.get("digest") or receipt.get("commitment") or str(receipt.get("sha256", ""))
     save_case(case)
     return case
 
