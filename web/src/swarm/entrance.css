@@ -1,0 +1,156 @@
+/*
+  Reload introduction for the swarm atlas.
+
+  The parent adds .atlas-entering to .swarm-map once the nodes have arrived and
+  removes it after 1800ms. Every animation below therefore finishes by ~1700ms
+  and uses `backwards` fill only: the element's own authored state (inline
+  opacity for selection dimming, fills, strokes, focus rings) is what the
+  eye lands on, so nothing is overridden permanently and nothing snaps when the
+  class is removed.
+
+  Deliberately absent: transforms on .map-geometry (the camera), pointer-events,
+  outlines, fills on interactive shapes and any overlay.
+
+  Stages (ms)        0 ─ perimeter orbits and degree ticks
+                   200 ─ swarm arcs drawn with a warm trace
+                   300 ─ agent sectors, in --order, stems / strips / nodes / labels
+                   520 ─ handoff traces travel source → target, then cool
+*/
+@media (prefers-reduced-motion: no-preference) {
+  .swarm-map.atlas-entering {
+    --enter-ease: cubic-bezier(.22, .7, .2, 1);
+    --enter-step: 45ms;
+    --enter-ink: #ffbf99;
+    --enter-glow: drop-shadow(0 0 2.5px rgb(255 170 116 / .8)) drop-shadow(0 0 7px rgb(255 140 84 / .38));
+    --enter-glow-off: drop-shadow(0 0 0 rgb(255 140 84 / 0));
+  }
+
+  /* ── 1. Perimeter: dotted orbits settle outside-in, then the degree scale ── */
+  .atlas-entering .outer-orbits circle {
+    animation: atlas-enter-orbit 640ms var(--enter-ease) backwards;
+  }
+  .atlas-entering .outer-orbits circle:nth-child(2) { animation-delay: 130ms; }
+  .atlas-entering .outer-orbits circle:nth-child(3) { animation-delay: 260ms; }
+
+  /* The 120 ticks are the only <path> siblings of the orbit group, so
+     nth-of-type is the tick index. Ten ticks per band, twelve bands, swept
+     clockwise from the top. */
+  .atlas-entering .degree {
+    --enter-band: 0;
+    animation: atlas-enter-tick 300ms var(--enter-ease) calc(40ms + var(--enter-band) * 34ms) backwards;
+  }
+  .atlas-entering .degree:nth-of-type(n+11):nth-of-type(-n+20)   { --enter-band: 1; }
+  .atlas-entering .degree:nth-of-type(n+21):nth-of-type(-n+30)   { --enter-band: 2; }
+  .atlas-entering .degree:nth-of-type(n+31):nth-of-type(-n+40)   { --enter-band: 3; }
+  .atlas-entering .degree:nth-of-type(n+41):nth-of-type(-n+50)   { --enter-band: 4; }
+  .atlas-entering .degree:nth-of-type(n+51):nth-of-type(-n+60)   { --enter-band: 5; }
+  .atlas-entering .degree:nth-of-type(n+61):nth-of-type(-n+70)   { --enter-band: 6; }
+  .atlas-entering .degree:nth-of-type(n+71):nth-of-type(-n+80)   { --enter-band: 7; }
+  .atlas-entering .degree:nth-of-type(n+81):nth-of-type(-n+90)   { --enter-band: 8; }
+  .atlas-entering .degree:nth-of-type(n+91):nth-of-type(-n+100)  { --enter-band: 9; }
+  .atlas-entering .degree:nth-of-type(n+101):nth-of-type(-n+110) { --enter-band: 10; }
+  .atlas-entering .degree:nth-of-type(n+111)                     { --enter-band: 11; }
+
+  /* ── 2. Swarm arcs: each is inked along the perimeter with a warm head ── */
+  .atlas-entering [data-swarm] > path {
+    animation: atlas-enter-arc 820ms linear 220ms backwards;
+  }
+  .atlas-entering [data-swarm="discovery"] > path { animation-delay: 330ms; }
+  .atlas-entering [data-swarm="challenge"] > path { animation-delay: 440ms; }
+  .atlas-entering [data-swarm="decision"]  > path { animation-delay: 550ms; }
+
+  /* ── 3. Agent sectors, staggered by their inline --order (0–11) ── */
+  .atlas-entering .agent-sector {
+    --enter-i: min(var(--order, 0), 11);
+    --enter-at: calc(var(--enter-i) * var(--enter-step));
+    animation: atlas-enter-fade 520ms var(--enter-ease) calc(300ms + var(--enter-at)) backwards;
+  }
+
+  /* stem (curve out of the node) then the strip of reference ticks */
+  .atlas-entering .agent-sector > g > path:first-child {
+    animation: atlas-enter-stem 480ms var(--enter-ease) calc(340ms + var(--enter-at)) backwards;
+  }
+  .atlas-entering .agent-sector > g > path:last-child {
+    --enter-k: 0;
+    animation: atlas-enter-strip 420ms var(--enter-ease) calc(430ms + var(--enter-at) + var(--enter-k) * 32ms) backwards;
+  }
+  .atlas-entering .agent-sector > g:nth-of-type(2) > path:last-child { --enter-k: 1; }
+  .atlas-entering .agent-sector > g:nth-of-type(3) > path:last-child { --enter-k: 2; }
+  .atlas-entering .agent-sector > g:nth-of-type(4) > path:last-child { --enter-k: 3; }
+  .atlas-entering .agent-sector > g:nth-of-type(5) > path:last-child { --enter-k: 4; }
+  .atlas-entering .agent-sector > g:nth-of-type(6) > path:last-child { --enter-k: 5; }
+  .atlas-entering .agent-sector > g:nth-of-type(7) > path:last-child { --enter-k: 6; }
+  .atlas-entering .agent-sector > g:nth-of-type(8) > path:last-child { --enter-k: 7; }
+
+  /* outward dotted spoke to the label, node rings, then the type */
+  .atlas-entering .agent-sector > path[stroke-dasharray] {
+    animation: atlas-enter-fade 380ms var(--enter-ease) calc(520ms + var(--enter-at)) backwards;
+  }
+  .atlas-entering .agent-sector > circle {
+    animation: atlas-enter-fade 360ms var(--enter-ease) calc(400ms + var(--enter-at)) backwards;
+  }
+  .atlas-entering .agent-name {
+    animation: atlas-enter-name 460ms var(--enter-ease) calc(640ms + var(--enter-at)) backwards;
+  }
+  .atlas-entering .agent-sub {
+    animation: atlas-enter-sub 420ms var(--enter-ease) calc(760ms + var(--enter-at)) backwards;
+  }
+
+  /* ── 4. Handoff traces: drawn source → target with a glow that cools ── */
+  .atlas-entering .handoffs > g > path {
+    animation: atlas-enter-trace 720ms linear 520ms backwards;
+  }
+  .atlas-entering .handoffs > g:nth-child(4n+2) > path { animation-delay: 620ms; }
+  .atlas-entering .handoffs > g:nth-child(4n+3) > path { animation-delay: 720ms; }
+  .atlas-entering .handoffs > g:nth-child(4n+4) > path { animation-delay: 820ms; }
+}
+
+/* Reduced motion gets none of the above: the file is inert outside the query. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes atlas-enter-orbit {
+    from { opacity: 0; stroke-dashoffset: -34; }
+  }
+
+  @keyframes atlas-enter-tick {
+    from { opacity: 0; stroke-dasharray: 8; stroke-dashoffset: 8; }
+    to   { stroke-dasharray: 8; stroke-dashoffset: 0; }
+  }
+
+  /* The first leg crosses the unseen part of an oversized dash quickly, so the
+     visible ink starts almost immediately whatever the arc's real length. */
+  @keyframes atlas-enter-arc {
+    0%   { stroke-dasharray: 900; stroke-dashoffset: 900; stroke: var(--enter-ink); filter: var(--enter-glow); animation-timing-function: linear; }
+    14%  { stroke-dasharray: 900; stroke-dashoffset: 440; stroke: var(--enter-ink); filter: var(--enter-glow); animation-timing-function: cubic-bezier(.3, .55, .3, 1); }
+    72%  { stroke-dasharray: 900; stroke-dashoffset: 0; stroke: var(--enter-ink); filter: var(--enter-glow); }
+    100% { stroke-dasharray: 900; stroke-dashoffset: 0; filter: var(--enter-glow-off); }
+  }
+
+  @keyframes atlas-enter-fade {
+    from { opacity: 0; }
+  }
+
+  @keyframes atlas-enter-stem {
+    from { opacity: 0; stroke-dasharray: 120; stroke-dashoffset: 120; }
+    to   { stroke-dasharray: 120; stroke-dashoffset: 0; }
+  }
+
+  /* Strips are many short subpaths and dashes restart per subpath. */
+  @keyframes atlas-enter-strip {
+    from { opacity: 0; stroke-dasharray: 22; stroke-dashoffset: 22; }
+    to   { stroke-dasharray: 22; stroke-dashoffset: 0; }
+  }
+
+  @keyframes atlas-enter-name {
+    from { opacity: 0; fill: var(--enter-ink); filter: blur(1.6px); }
+  }
+
+  @keyframes atlas-enter-sub {
+    from { opacity: 0; filter: blur(1.2px); }
+  }
+
+  @keyframes atlas-enter-trace {
+    0%   { stroke-dasharray: 420; stroke-dashoffset: 420; stroke: var(--enter-ink); stroke-opacity: .95; filter: var(--enter-glow); }
+    62%  { stroke-dasharray: 420; stroke-dashoffset: 0; stroke: var(--enter-ink); stroke-opacity: .95; filter: var(--enter-glow); animation-timing-function: ease-out; }
+    100% { stroke-dasharray: 420; stroke-dashoffset: 0; filter: var(--enter-glow-off); }
+  }
+}
