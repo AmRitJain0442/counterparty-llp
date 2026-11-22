@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from .account import capabilities
 from .adjudication import adjudicate
 from .demo import build_demo
 from .drafting import draft_note
@@ -60,6 +61,11 @@ async def same_origin(request: Request, call_next):
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/capabilities")
+def provider_capabilities():
+    return capabilities()
 
 
 @app.get("/api/cases")
