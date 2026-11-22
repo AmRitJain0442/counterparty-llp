@@ -33,23 +33,36 @@ export function useMapCamera(svgRef, focusNode, resetKey) {
   const fit = useCallback(() => update(initial()), [update])
   const zoomBy = useCallback(factor => zoomAt(factor, { x: 450, y: 367.5 }), [zoomAt])
   useEffect(() => { fit() }, [resetKey, fit])
+  const lastFocus = useRef(null)
   const id = focusNode?.id
   const x = focusNode?.pos?.[0]
   const y = focusNode?.pos?.[1]
   useEffect(() => {
-    if (id == null || !Number.isFinite(x) || !Number.isFinite(y)) return
+    if (id == null) {
+      if (lastFocus.current != null) fit()
+      lastFocus.current = null
+      return
+    }
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return
+    lastFocus.current = id
     const zoom = 1.65
     update({ zoom, x: 450 - x * zoom, y: 367.5 - y * zoom })
-  }, [id, x, y, resetKey, update])
+  }, [id, x, y, resetKey, update, fit])
   useEffect(() => {
     const svg = svgRef.current
     if (!svg) return
+    let wheelEnd
     const wheel = e => {
       e.preventDefault()
-      zoomAt(Math.exp(-Math.max(-100, Math.min(100, e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 735 : 1))) * .002), point(e.clientX, e.clientY))
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 735 : 1
+      const delta = Math.max(-100, Math.min(100, e.deltaY * unit))
+      setNavigating(true)
+      zoomAt(Math.exp(-delta * .002), point(e.clientX, e.clientY))
+      clearTimeout(wheelEnd)
+      wheelEnd = setTimeout(() => { if (!gesture.current) setNavigating(false) }, 100)
     }
     svg.addEventListener('wheel', wheel, { passive: false })
-    return () => svg.removeEventListener('wheel', wheel)
+    return () => { svg.removeEventListener('wheel', wheel); clearTimeout(wheelEnd) }
   }, [svgRef, point, zoomAt])
   const end = e => {
     if (!pointers.current.has(e.pointerId)) return
@@ -68,8 +81,8 @@ export function useMapCamera(svgRef, focusNode, resetKey) {
         if (e.pointerType === 'mouse' && e.button !== 0) return
         const p = point(e.clientX, e.clientY)
         if (!p) return
-        pointers.current.set(e.pointerId, { ...p, x: p.x, y: p.y, startX: e.clientX, startY: e.clientY })
-        e.currentTarget.setPointerCapture(e.pointerId)
+        if (!pointers.current.size) lastDrag.current = -Infinity
+        pointers.current.set(e.pointerId, { x: p.x, y: p.y, startX: e.clientX, startY: e.clientY })
       },
       onPointerMove(e) {
         const previous = pointers.current.get(e.pointerId)
@@ -77,6 +90,7 @@ export function useMapCamera(svgRef, focusNode, resetKey) {
         const p = point(e.clientX, e.clientY)
         if (!p) return
         if (!gesture.current && Math.hypot(e.clientX - previous.startX, e.clientY - previous.startY) < 4) return
+        if (!e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.setPointerCapture(e.pointerId)
         gesture.current = true
         lastDrag.current = Date.now()
         setNavigating(true)
@@ -93,7 +107,7 @@ export function useMapCamera(svgRef, focusNode, resetKey) {
       },
       onPointerUp: end,
       onPointerCancel: end,
-      onLostPointerCapture: end,
+      onLostPointerCapture(e) { if (e.target === e.currentTarget) end(e) },
       onClickCapture(e) {
         if (draggedRecently()) { e.preventDefault(); e.stopPropagation() }
       },

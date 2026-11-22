@@ -9,7 +9,7 @@ import './atlas.css'
 export default function SwarmAtlas({onFile,desk,onDesk,cases=[]}) {
   const [agents,setAgents]=useState([])
   const [selected,setSelected]=useState(null)
-  const [panel,setPanel]=useState(()=>window.innerWidth>=1050)
+  const [panel,setPanel]=useState(()=>window.innerWidth>=900)
   const [section,setSection]=useState('agents')
   const [events,setEvents]=useState([])
   const [record,setRecord]=useState(null)
