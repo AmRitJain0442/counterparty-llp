@@ -21,7 +21,7 @@ from .watch import router as watch_router
 from .watch_history import watch_history
 from . import progress
 from .live import collect_live
-from .storage import get_case, list_cases, save_case
+from .storage import append_review, get_case, list_cases, reviews_for, save_case
 
 app = FastAPI(title="Counterparty LLP", version="0.1.0")
 app.include_router(watch_router)
@@ -92,6 +92,29 @@ def detail(case_id: str):
     if case is None:
         raise HTTPException(404, "Case not found")
     return case
+
+
+class ReviewerEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    disposition: Literal["Callback requested", "Clarification requested", "Evidence corrected", "Review complete"]
+    note: str = Field(min_length=1, max_length=800)
+
+
+@app.get("/api/cases/{case_id}/reviews")
+def case_reviews(case_id: str):
+    detail(case_id)
+    return reviews_for(case_id)
+
+
+@app.post("/api/cases/{case_id}/reviews", status_code=201)
+def add_case_review(case_id: str, entry: ReviewerEntry):
+    review = {**entry.model_dump(), "id": uuid4().hex, "as_of": datetime.now(timezone.utc).isoformat()}
+    try:
+        return append_review(case_id, review)
+    except KeyError:
+        raise HTTPException(404, "Case not found") from None
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
 
 
 @app.get("/api/cases/{case_id}/receipt")

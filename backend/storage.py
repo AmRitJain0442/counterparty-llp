@@ -395,3 +395,24 @@ def get_cached_batch(key: str) -> dict | None:
     else:
         return None
     return {"mode": "CACHED", "as_of": row[0], "data": json.loads(row[1])} if row else None
+
+def append_review(case_id, review):
+    """Keep operator dispositions outside the sealed decision and serialize concurrent appends."""
+    key = _case_key(case_id)
+
+    def write(tx):
+        if tx.get("cases", key) is None:
+            raise KeyError("case not found")
+        doc = tx.get("human_reviews", key) or {"items": []}
+        items = doc["items"]
+        if len(items) >= 200:
+            raise ValueError("Review log capacity reached")
+        tx.put("human_reviews", key, {"items": [*items, review]})
+        return review
+
+    return _ledger().atomic(write)
+
+
+def reviews_for(case_id):
+    doc = _ledger().get("human_reviews", _case_key(case_id))
+    return doc["items"] if doc else []
