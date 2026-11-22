@@ -1,11 +1,13 @@
 """Counterparty LLP single-origin application."""
+import asyncio
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -14,6 +16,7 @@ from .demo import build_demo
 from .drafting import draft_note
 from .receipts import create_receipt
 from .watch import router as watch_router
+from . import progress
 from .live import collect_live
 from .storage import get_case, list_cases, save_case
 
@@ -83,6 +86,7 @@ def investigate(intake: Intake):
         raw = collect_live(intake.desk, subject, intake.consent, intake.inputs)
     else:
         raw = build_demo(intake.desk)
+    progress.report("Opposing counsel", "running", "Checking evidence and alternative explanations")
     ruling = adjudicate(intake.desk, raw)
     case = {
         "id": uuid4().hex,
@@ -99,16 +103,55 @@ def investigate(intake: Intake):
         "credits": raw["credits"],
     }
     if intake.mode == "live":
+        progress.report("Gemini drafting counsel", "running", "Preparing the reviewer handoff on Vertex AI")
         note, status = draft_note(intake.desk, case["evidence"], case["verdict"])
         case["steps"].append({"name": "Gemini drafting counsel", "status": status,
                               "detail": note or "Vertex AI draft unavailable for this case."})
         if note:
             case["draft"] = note
+    progress.report("Ledger", "running", "Committing the evidence receipt")
     receipt = create_receipt(case)
     case["receipt_record"] = receipt
     case["receipt"] = receipt.get("digest") or receipt.get("commitment") or str(receipt.get("sha256", ""))
     save_case(case)
     return case
+
+
+@app.post("/api/cases/stream")
+async def stream_investigation(intake: Intake):
+    """Stream actual collection boundaries and the same persisted case as POST /cases."""
+    loop = asyncio.get_running_loop()
+    events = asyncio.Queue()
+
+    def send(event):
+        loop.call_soon_threadsafe(events.put_nowait, event)
+
+    def run():
+        token = progress.attach(send)
+        try:
+            send({"type": "case", "case": investigate(intake)})
+        except HTTPException as exc:
+            send({"type": "error", "detail": exc.detail})
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("Desk investigation interrupted")
+            send({"type": "error", "detail": "Investigation interrupted before filing."})
+        finally:
+            progress.detach(token)
+
+    async def body():
+        task = asyncio.create_task(asyncio.to_thread(run))
+        try:
+            while True:
+                event = await events.get()
+                yield json.dumps(event) + "\n"
+                if event["type"] in {"case", "error"}:
+                    break
+        finally:
+            await asyncio.shield(task)
+
+    return StreamingResponse(body(), media_type="application/x-ndjson",
+                             headers={"X-Accel-Buffering": "no"})
 
 
 if (WEB / "assets").is_dir():

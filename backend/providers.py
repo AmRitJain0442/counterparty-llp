@@ -1,4 +1,6 @@
 """Synchronous live evidence collection; no routing or verdicts."""
+from .progress import report
+
 import json
 import os
 import re
@@ -39,6 +41,7 @@ def run_live(desk, subject, consent=False, inputs=None):
     result = dict(evidence=[], steps=[], credits=[], flows=[], signals=[])
 
     def call(provider, operation, url, payload=None, headers=None, unavailable=False):
+        report(operation, 'running', f'Collecting {provider} evidence')
         eid = 'e' + str(len(result['evidence']) + 1)
         status, data, used = 'unavailable', None, None
         if not unavailable:
@@ -76,6 +79,7 @@ def run_live(desk, subject, consent=False, inputs=None):
             result['credits'].append(dict(evidence_id=eid, actual=used))
         kind = 'evidence_available' if status == 'ok' else ('provider_unavailable' if status == 'unavailable' else 'provider_failure')
         result['signals'].append(dict(type=kind, provider=provider, operation=operation, evidence_id=eid, status=status))
+        report(operation, status, f'{provider} collection finished')
         return data
 
     key = os.getenv('CRUSTDATA_API_KEY')
@@ -118,10 +122,21 @@ def run_live(desk, subject, consent=False, inputs=None):
         call('sec', 'submissions', 'https://data.sec.gov/submissions/CIK' + cik.zfill(10) + '.json',
              headers={'User-Agent': ua or ''}, unavailable=not ua)
     domain = str(inputs.get('domain', '')).lower()
-    if re.fullmatch(r'(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}', domain):
-        # Redirecting RDAP aggregator omitted until registry routing is reliable.
-        witness('crtsh', 'https://crt.sh/?' + urlencode({'q': domain, 'output': 'json'}))
-        witness('wayback', 'https://web.archive.org/cdx/search/cdx?' + urlencode({'url': domain + '/', 'output': 'json', 'filter': 'statuscode:200', 'limit': 20}))
+    if desk == 'payment' and re.fullmatch(r'(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}', domain):
+        # Registry endpoints from IANA's DNS RDAP bootstrap. Keep requests on fixed origins.
+        registries = {
+            'com': 'https://rdap.verisign.com/com/v1/',
+            'net': 'https://rdap.verisign.com/net/v1/',
+            'org': 'https://rdap.publicinterestregistry.org/rdap/',
+            'no': 'https://rdap.norid.no/',
+            'ai': 'https://rdap.identitydigital.services/rdap/',
+        }
+        registry = registries.get(domain.rsplit('.', 1)[-1])
+        if registry:
+            witness('rdap', registry + 'domain/' + domain)
+        if inputs.get('domain_history'):
+            witness('crtsh', 'https://crt.sh/?' + urlencode({'q': domain, 'output': 'json'}))
+            witness('wayback', 'https://web.archive.org/cdx/search/cdx?' + urlencode({'url': domain + '/', 'output': 'json', 'filter': 'statuscode:200', 'limit': 20}))
     if inputs.get('ifsc') and re.fullmatch(r'[A-Z]{4}0[A-Z0-9]{6}', str(inputs['ifsc'])):
         witness('ifsc', 'https://ifsc.razorpay.com/' + inputs['ifsc'])
     if inputs.get('iban') and re.fullmatch(r'[A-Z]{2}\d{2}[A-Z0-9]{10,30}', str(inputs['iban'])):
