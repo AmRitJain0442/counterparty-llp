@@ -91,6 +91,8 @@ export default function CaseFile({ record, loading, error }) {
   const desk = DESK_BY_ID[record.desk]
   const tone = verdictTone(record.verdict)
   const evidence = record.evidence || []
+  const referred = new Set(record.council_decision?.specialist_referrals || [])
+  const specialistReferrals = (record.swarm_reports || []).filter(report => referred.has(report.agent_id))
   const crust = evidence.filter(e => /crustdata/i.test(e.source)).length
   const witnessOutside = evidence.filter(e => !/crustdata|gemini|internal/i.test(e.source)).length
   const [flowTitle, unit] = FLOW_TITLE[record.desk] || FLOW_TITLE.payment
@@ -114,6 +116,10 @@ export default function CaseFile({ record, loading, error }) {
       </header>
 
       <p className="case-summary">{record.summary}</p>
+      {specialistReferrals.length > 0 && <details className="draft">
+        <summary>Specialists requesting further review ({specialistReferrals.length})</summary>
+        {specialistReferrals.map(report => <p key={report.agent_id}><strong>{report.name}</strong><br/>{report.detail}</p>)}
+      </details>}
       {record.draft && (
         <div className="draft"><span className="label">Drafting counsel’s note</span><p>{record.draft}</p></div>
       )}
