@@ -4,6 +4,7 @@ from contextvars import copy_context
 import re
 from .providers import run_live
 from .identity import resolve_public_ids
+from .observations import describe
 
 
 def collect_live(desk, subject, consent=False, inputs=None):
@@ -46,16 +47,7 @@ def collect_live(desk, subject, consent=False, inputs=None):
                 raw[key].extend(extra[key])
     evidence = []
     for e in raw['evidence']:
-        detail = 'Source unavailable; no inference.'
-        data = e.get('data')
-        if e['status'] == 'ok':
-            detail = 'Record retrieved; identity and independent corroboration required.'
-            if e['provider'] == 'ifsc' and isinstance(data, dict):
-                detail = '; '.join(f'{k}: {data[k]}' for k in ('BANK', 'BRANCH', 'IFSC') if isinstance(data.get(k), str))
-            if e['provider'] == 'brreg' and isinstance(data, dict):
-                detail = '; '.join(f'{k}: {data[k]}' for k in ('organisasjonsnummer', 'navn', 'registreringsdatoEnhetsregisteret', 'stiftelsesdato', 'konkurs') if isinstance(data.get(k), (str, bool)))
-            if e['provider'] == 'sec' and isinstance(data, dict):
-                detail = '; '.join(f'{k}: {data[k]}' for k in ('cik', 'name', 'sicDescription') if isinstance(data.get(k), (str, int)))
+        detail = describe(e)
         evidence.append(dict(source=e['provider'], label=e['operation'], detail=detail,
                              as_of=e['as_of'], mode='LIVE', url=e['source']))
     credits = [c.get('actual') for c in raw['credits']]
