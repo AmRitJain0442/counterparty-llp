@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from backend.adjudication import adjudicate
 from backend.findings import interpret
 
 
@@ -247,3 +248,97 @@ def test_open_role_does_not_extend_to_a_later_claim_or_peer():
     result = run("candidate", person(target), company(), peers, inputs={**INPUTS, "claim": "2024 to 2025"})
     assert "No documented overlap" in card(result, "Claimed employment dates")["detail"]
     assert all(e["label"] != "Colleague overlap" for e in result["evidence"])
+
+
+def registry(**updates):
+    return row("brreg", {"organisasjonsnummer": "123456789", "navn": "Vendor AS",
+                         "hjemmeside": "https://www.vendor.example", **updates}, provider="brreg")
+
+
+def test_independent_vendor_records_pass_the_live_callback_gate():
+    result = run("payment", company(), registry(), rdap(), person(profile(81, [VENDOR], [NEXT])),
+                 inputs={**PAY, "orgnr": "123456789"})
+    assert adjudicate("payment", result)["verdict"] == "HELD"
+    by_id = {card["id"]: card for card in result["evidence"]}
+    signals = [s for s in result["signals"] if s["claim"] == result["proposition"]]
+    assert {by_id[s["evidence_id"]]["source"] for s in signals} == {"Crustdata", "Brønnøysund"}
+    assert len(signals) == 2
+    assert all(by_id[s["evidence_id"]]["claim"] == s["claim"] for s in result["signals"])
+    assert PRIVATE not in json.dumps(result)
+
+
+@pytest.mark.parametrize("registry_row", [
+    registry(organisasjonsnummer="123456780"), registry(navn="Different Vendor AS"),
+    registry(hjemmeside="other.example"), row("brreg", None, provider="brreg", status="http_503"),
+    row("brreg", registry()["data"], provider="crustdata"),
+])
+def test_unrelated_payment_facts_never_replace_a_missing_domain_witness(registry_row):
+    result = run("payment", company(), registry_row, rdap(), person(profile(81, [VENDOR], [NEXT])),
+                 inputs={**PAY, "orgnr": "123456789"})
+    assert adjudicate("payment", result)["verdict"] != "HELD"
+    assert all(e["label"] != "Vendor domain cross-check" for e in result["evidence"])
+
+
+@pytest.mark.parametrize("sender", ["vendor.example", "billing.vendor.example", "alternate.example"])
+def test_vendor_and_a_known_alias_or_subdomain_cannot_trigger_callback(sender):
+    identified = company()
+    identified["data"][0]["matches"][0]["company_data"]["basic_info"]["all_domains"] = ["alternate.example"]
+    result = run("payment", identified, registry(), inputs={**PAY, "sender_domain": sender, "orgnr": "123456789"})
+    assert adjudicate("payment", result)["verdict"] != "HELD"
+
+
+def test_stale_profile_remains_historical_context_and_cannot_vote():
+    old = person(profile(81, [VENDOR], [NEXT], updated="2026-08-12"))
+    result = run("payment", company(), old, rdap(), inputs=PAY)
+    assert card(result, "Next-employer start")["observed_on"] == "2026-08-08"
+    assert not any(s["operation"] == "person_enrich" for s in result["signals"])
+    assert adjudicate("payment", result)["verdict"] == "INSUFFICIENT WITNESSES"
+    assert any(s["name"] == "Profile freshness" and s["status"] == "unknown" for s in result["steps"])
+
+
+def test_person_identify_and_enrich_must_agree_on_the_person_id():
+    identity = person({"crustdata_person_id": 99})
+    identity["operation"] = "person_identify"
+    result = run("payment", company(), identity, person(profile(81, [VENDOR], [NEXT])), inputs=PAY)
+    assert adjudicate("payment", result)["verdict"] == "IDENTITY REVIEW"
+    assert all(e["label"] != "Next-employer start" for e in result["evidence"])
+
+
+def test_company_estimates_and_filing_index_are_independent_facts():
+    headcount = {"by_function_timeseries": {"CURRENT_FUNCTION": {"Finance": [
+        {"date": "2026-09-30", "employee_count": 19}, {"date": "2026-06-30", "employee_count": 27},
+        {"date": "2027-01-01", "employee_count": 9040}]}}}
+    listing = {"company": {"basic_info": {"crustdata_company_id": 21}},
+               "metadata": {"date_added": "2026-09-29T03:00:00Z"}, "content": {"description": PRIVATE}}
+    postings = row("job_search", {"job_listings": [
+        listing, {**listing, "company": {"basic_info": {"crustdata_company_id": 72}},
+                  "metadata": {"date_added": "2026-10-14"}}]})
+    result = run("company", company(), company("company_enrich", headcount=headcount), submissions(), postings)
+    finance = card(result, "Finance headcount")
+    assert "19" in finance["detail"] and "27" in finance["detail"] and "9040" not in finance["detail"]
+    assert card(result, "Indexed job posting")["observed_on"] == "2026-09-29"
+    assert finance["claim"] != card(result, "8-K Item 5.02")["claim"]
+    assert adjudicate("company", result)["verdict"] == "INSUFFICIENT WITNESSES"
+    assert PRIVATE not in json.dumps(result)
+
+
+def test_executive_start_dates_use_embedded_enrichment_role_schema_and_suppress_small_groups():
+    def executive(i):
+        return {"crustdata_person_id": i, "basic_profile": {"name": PRIVATE}, "experience": {"employment_details": {
+            "current": [{"employer_company_id": ["21"], "employee_start_date": f"2020-02-0{i}"},
+                        {"employer_company_id": ["706"], "employee_start_date": "2001-01-01"}]}}}
+    leaders = [executive(i) for i in range(1, 6)]
+    result = run("company", company(), company("company_enrich", people={"cxos": [*leaders, leaders[0]]}))
+    detail = card(result, "Executive role starts")["detail"]
+    assert "5 distinct" in detail and "2020-02-01" in detail and "2020-02-05" in detail and "2001" not in detail
+    assert PRIVATE not in json.dumps(result)
+    thin = run("company", company(), company("company_enrich", people={"cxos": leaders[:-1]}))
+    assert all(e["label"] != "Executive role starts" for e in thin["evidence"])
+
+
+def test_candidate_date_and_staffing_checks_leave_the_employment_decision_with_the_reviewer():
+    result = run("candidate", company(), person(profile(81, [VENDOR])), engineering_counts(), submissions(),
+                 inputs={**INPUTS, "claim": "Led 40 engineers in Q3 2023"})
+    assert result["proposition"] == card(result, "Claimed headcount")["claim"]
+    assert {s["provider"] for s in result["signals"]} == {"crustdata"}
+    assert adjudicate("candidate", result)["verdict"] == "INSUFFICIENT WITNESSES"
