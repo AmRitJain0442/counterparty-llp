@@ -178,6 +178,22 @@ def get_case(id: str) -> dict | None:
     return _decision(doc) if doc else None
 
 
+def attach_receipt(case: dict, receipt: dict) -> None:
+    """Attach the verified bundle only if the snapshot sent for signing is still current."""
+    key = _case_key(case["id"])
+    snapshot = {k: v for k, v in case.items() if k != "watch_review"}
+    expected = _json(snapshot)
+
+    def attach(tx):
+        doc = tx.get("cases", key)
+        if doc is None or doc["decision_json"] != expected:
+            raise ValueError("Case changed during signing. Re-read the decision before attaching a receipt")
+        updated = {**snapshot, "receipt": receipt["digest"], "receipt_record": receipt}
+        tx.put("cases", key, {**doc, "decision_json": _json(updated)})
+
+    _ledger().atomic(attach)
+
+
 def _watch_key(watch_id):
     key = str(watch_id)
     if not re.fullmatch(r"[1-9][0-9]{0,19}", key):

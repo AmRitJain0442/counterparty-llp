@@ -1,0 +1,99 @@
+{
+  "finding": {
+    "id": "synthetic-case",
+    "verdict": "SIGNED",
+    "as_of": "2026-01-01"
+  },
+  "receipt": {
+    "version": 1,
+    "status": "REKOR_VERIFIED",
+    "nonce": "5042374efe22f5920d83072043288f4eb99d4f72a93cbaf3ddfc46c418234033",
+    "digest": "2a6efa344c0dc0f74f677839dcf736c5d9e75a5578959a0b643b8584574c1b68",
+    "bundle": {
+      "mediaType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+      "verificationMaterial": {
+        "publicKey": {
+          "hint": "MHbrLX4QpS9in87g23n2360zLDaO4VE9/rsFusYjQo8="
+        },
+        "tlogEntries": [
+          {
+            "logId": {
+              "keyId": "7oAR001d9aPcEozk/P31BG5HGj1yMhZhFEtEPI08GBk="
+            },
+            "kindVersion": {
+              "kind": "hashedrekord",
+              "version": "0.0.1"
+            },
+            "integratedTime": "1795334584",
+            "inclusionPromise": {
+              "signedEntryTimestamp": "MEYCIQDMtxTwFyghPZ9D5YcssexAgvN3J6xjK+b2B4yY2d+eoQIhAPg0xfElsaL8neI+cWv3VuB//8MyryUV5NT2zTYz6mb9"
+            },
+            "inclusionProof": {
+              "rootHash": "upXdQ4rjnCXkEix5Z+Vppl51Amcm3J5Ni43JlG9kW64=",
+              "treeSize": "1",
+              "checkpoint": {
+                "envelope": "fixture.rekor - 1\n1\nupXdQ4rjnCXkEix5Z+Vppl51Amcm3J5Ni43JlG9kW64=\n\n\u2014 fixture.rekor 7oAR0zBGAiEAwu81h/rvAbXdsFBY5BrznPTu4E7ZKz3zT2S5CEU6OngCIQD9ESEMcaloUHlED759crb1W+aqGEqKbs2G2TwEPrcMUw==\n"
+              }
+            },
+            "canonicalizedBody": "eyJhcGlWZXJzaW9uIjoiMC4wLjEiLCJraW5kIjoiaGFzaGVkcmVrb3JkIiwic3BlYyI6eyJkYXRhIjp7Imhhc2giOnsiYWxnb3JpdGhtIjoic2hhMjU2IiwidmFsdWUiOiJjZTI2NGYxOTFhZmI3MTczYzdmYzY2YjVhNTJhZDNkODZjMjBmYjM2N2E4MjkzYjM2NWIyY2RlODkyZmJlMTI3In19LCJzaWduYXR1cmUiOnsiY29udGVudCI6Ik1FWUNJUURLcmZnaElzQ0RqZVVPWGZSaURuMVVKK1VLb2h3eUcrdlV3Q1JwaGRISVRnSWhBUEtEOEVQd1dsaWNHNm94OUE3UkJxZDBHTTljaGFtaURMVWozOXUyR1BjVCIsInB1YmxpY0tleSI6eyJjb250ZW50IjoiTFMwdExTMUNSVWRKVGlCUVZVSk1TVU1nUzBWWkxTMHRMUzBLVFVacmQwVjNXVWhMYjFwSmVtb3dRMEZSV1VsTGIxcEplbW93UkVGUlkwUlJaMEZGTVZNd2VFd3pjMUp5VlU1WVEwNTVZblkwTlZseFdrVnRkV2x6WXdwUWNsSjJWWGhNWjNKSVNUSktVeXR4VDFoRVkyTmxlVmt3VjNoVE1tOUdaVU5MTDFKd1dHVldkVXhTVlN0Vk1tNDRTekExTVRkWFpIUjNQVDBLTFMwdExTMUZUa1FnVUZWQ1RFbERJRXRGV1MwdExTMHRDZz09In19fX0="
+          }
+        ],
+        "timestampVerificationData": {
+          "rfc3161Timestamps": [
+            {
+              "signedTimestamp": "MIIB5jADAgEAMIIB3QYJKoZIhvcNAQcCoIIBzjCCAcoCAQMxDzANBglghkgBZQMEAgEFADBjBgsqhkiG9w0BCRABBKBUBFIwUAIBAQYEKgMEATAxMA0GCWCGSAFlAwQCAQUABCAKc2C4ZcqN1FHUML3mj2e/wmnhRB1Ega61sN/n8RhrCwIBAhgPMjAyNjExMjIwODAzMDNaMYIBTTCCAUkCAQEwOTAhMR8wHQYDVQQDDBZGaXh0dXJlIHRpbWVzdGFtcCByb290AhQ6suDW5kkGPz/eXIV7CMSkYIgN5zANBglghkgBZQMEAgEFAKCBpDAaBgkqhkiG9w0BCQMxDQYLKoZIhvcNAQkQAQQwHAYJKoZIhvcNAQkFMQ8XDTI2MTEyMjA4MDMwM1owLwYJKoZIhvcNAQkEMSIEIGa05mNylxH2CdG9o2D1a8wA2+u96HqdCH8l1dXV1SjZMDcGCyqGSIb3DQEJEAIvMSgwJjAkMCIEIG73r8dQn8AV+8UYwoO1bXxansopP8AzYxdg4U0EtIfVMAoGCCqGSM49BAMCBEcwRQIgAhgr9uEEknnKrXIThzFHbTYnzj4EN6Nl0IKNeJTgaUMCIQD/aXP58fDJDJCxLYBcIxd3xCr4dVQd08GBQuNk8rb+Pw=="
+            }
+          ]
+        }
+      },
+      "messageSignature": {
+        "messageDigest": {
+          "algorithm": "SHA2_256",
+          "digest": "ziZPGRr7cXPH/Ga1pSrT2Gwg+zZ6gpOzZbLN6JL74Sc="
+        },
+        "signature": "MEYCIQDKrfghIsCDjeUOXfRiDn1UJ+UKohwyG+vUwCRphdHITgIhAPKD8EPwWlicG6ox9A7RBqd0GM9chamiDLUj39u2GPcT"
+      }
+    }
+  },
+  "public_key": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1S0xL3sRrUNXCNybv45YqZEmuisc\nPrRvUxLgrHI2JS+qOXDcceyY0WxS2oFeCK/RpXeVuLRU+U2n8K0517Wdtw==\n-----END PUBLIC KEY-----\n",
+  "trusted_root": {
+    "mediaType": "application/vnd.dev.sigstore.trustedroot+json;version=0.1",
+    "tlogs": [
+      {
+        "baseUrl": "http://127.0.0.1:53014",
+        "hashAlgorithm": "SHA2_256",
+        "publicKey": {
+          "rawBytes": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAED66ll/RKyffWkej584tBBfeCa6O4y+qNaLUk9rjRMxxSirEozsKNUAJYv4xki115OsMl1aXoKDtYpHeMZczlGg==",
+          "keyDetails": "PKIX_ECDSA_P256_SHA_256",
+          "validFor": {
+            "start": "2020-01-01T00:00:00Z"
+          }
+        },
+        "logId": {
+          "keyId": "7oAR001d9aPcEozk/P31BG5HGj1yMhZhFEtEPI08GBk="
+        }
+      }
+    ],
+    "timestampAuthorities": [
+      {
+        "subject": {
+          "commonName": "Fixture timestamp root"
+        },
+        "uri": "http://127.0.0.1:53014/tsa",
+        "certChain": {
+          "certificates": [
+            {
+              "rawBytes": "MIIBvjCCAWSgAwIBAgIUOrLg1uZJBj8/3lyFewjEpGCIDecwCgYIKoZIzj0EAwIwITEfMB0GA1UEAwwWRml4dHVyZSB0aW1lc3RhbXAgcm9vdDAeFw0yMDAxMDEwMDAwMDBaFw00NTAxMDEwMDAwMDBaMCMxITAfBgNVBAMMGEZpeHR1cmUgdGltZXN0YW1wIHNpZ25lcjBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABNjUYBCZr24qijXmnMvFP1YeE4XHuOiF1lGGApYp2Of6S3Vfz3x4aclsuNd3q9pjcguxYIxzeTfEHydhfzS9qZ2jeDB2MAwGA1UdEwEB/wQCMAAwDgYDVR0PAQH/BAQDAgeAMB0GA1UdDgQWBBSr6JUctDyZdIDj8u79ik2TSbtS/DAfBgNVHSMEGDAWgBSraf6suSPrf8bIDOS9xGk3VEkkGTAWBgNVHSUBAf8EDDAKBggrBgEFBQcDCDAKBggqhkjOPQQDAgNIADBFAiEA1or8pjBcuMtAFYi5r9+PaPgyUNIHbLtJCYBWCNwMGyECIH5mD14JmramhENoBzZ1ZWiH231ybMxCxOfg+fZcC8du"
+            },
+            {
+              "rawBytes": "MIIBpzCCAU2gAwIBAgIUSgxNpfhvgIdN5YO8149M6Bq55HYwCgYIKoZIzj0EAwIwITEfMB0GA1UEAwwWRml4dHVyZSB0aW1lc3RhbXAgcm9vdDAeFw0yMDAxMDEwMDAwMDBaFw00NTAxMDEwMDAwMDBaMCExHzAdBgNVBAMMFkZpeHR1cmUgdGltZXN0YW1wIHJvb3QwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAASfhTMnfS2TQhKv+ct6hTGw6UsYtQpkPBO5rPYE3htMSCSXLE/t1kv60+NHmewkpD77NnKoKIl/6BYucvh+PcRgo2MwYTAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAdBgNVHQ4EFgQUq2n+rLkj63/GyAzkvcRpN1RJJBkwHwYDVR0jBBgwFoAUq2n+rLkj63/GyAzkvcRpN1RJJBkwCgYIKoZIzj0EAwIDSAAwRQIhAPd2yskokTMV2RfdyBbUDUIyXlCrxfg7Fn8HxvBbVqqxAiBGv765XCg8RUUDkqPphWw7zNk4GcOh3qVI1fGB8CHQlQ=="
+            }
+          ]
+        },
+        "validFor": {
+          "start": "2020-01-01T00:00:00Z"
+        }
+      }
+    ]
+  }
+}
