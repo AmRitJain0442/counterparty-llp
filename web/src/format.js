@@ -16,7 +16,7 @@ export function formatDate(value, withTime = false) {
   if (Number.isNaN(date.getTime())) return String(value)
   const day = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
   if (!withTime) return day
-  return day + ' · ' + date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  return day + ' Â· ' + date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
 export function formatCredits(credits) {
@@ -26,7 +26,7 @@ export function formatCredits(credits) {
 }
 
 export function shortDigest(digest = '') {
-  return digest.length > 18 ? digest.slice(0, 10) + '…' + digest.slice(-6) : digest
+  return digest.length > 18 ? digest.slice(0, 10) + 'â€¦' + digest.slice(-6) : digest
 }
 
 export function safeUrl(url) {
@@ -36,8 +36,7 @@ export function safeUrl(url) {
 /** Evidence from replayed or cached data carries its own label so it is never read as live. */
 export function evidenceBadge(row) {
   const text = String(row.mode || '').toUpperCase()
-  if (text === 'DEMO') return 'STORED REPLAY'
-  return text || 'UNLABELLED'
+  return ['LIVE', 'CACHED', 'REPLAY'].includes(text) ? text : 'UNVERIFIED'
 }
 
 /** Cases filed before the desks went live-only are labelled as stored replays, never as live. */

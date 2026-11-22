@@ -15,7 +15,7 @@ const RULES = [
   ['Movement is evidence, a stale profile is context', 'An exit is dated by the start date at the next employer. People who never update a profile stay in the unknown group.'],
   ['Aggregates, not people', 'Counts and timelines only, in groups of five or more. Individuals are named only with consent or as statutory officers. Dates of birth are never shown.'],
   ['Requests for explanation', 'No automated legal effect. An adverse result holds the payment or the file and sends a human to call back.'],
-  ['Everything is labelled', 'Every row carries an as-of date. Cached data says CACHED and stored replays say STORED REPLAY. New cases are always collected live.'],
+  ['Everything is labelled', 'Each new case collects live evidence. Reopening a filed case shows the dates and sources recorded during that investigation.'],
 ]
 
 const WORKSPACE = [

@@ -1,13 +1,12 @@
 import React, { useMemo, useState } from 'react'
 import { DESKS, DESK_BY_ID } from '../desks'
-import { formatCredits, formatDate, isLive, modeLabel, shortDigest, verdictTone } from '../format'
+import { formatCredits, formatDate, isLive, shortDigest, verdictTone } from '../format'
 import './ledger.css'
 
 export default function Ledger({ cases, loading, error, selectedId, onSelect, onRetry }) {
   const [desk, setDesk] = useState('all')
-  const [mode, setMode] = useState('live')
 
-  const scoped = useMemo(() => cases.filter(c => mode === 'all' || (mode === 'live') === isLive(c)), [cases, mode])
+  const scoped = useMemo(() => cases.filter(isLive), [cases])
   const rows = useMemo(() => [...scoped]
     .sort((a, b) => String(b.created_at || b.as_of).localeCompare(String(a.created_at || a.as_of)))
     .filter(c => desk === 'all' || c.desk === desk), [scoped, desk])
@@ -31,13 +30,6 @@ export default function Ledger({ cases, loading, error, selectedId, onSelect, on
               {DESKS.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </label>
-          <label>Mode
-            <select id="ledger-mode" value={mode} onChange={e => setMode(e.target.value)}>
-              <option value="live">Live cases</option>
-              <option value="stored">Stored replays</option>
-              <option value="all">Live and stored</option>
-            </select>
-          </label>
         </div>
       </div>
 
@@ -50,13 +42,13 @@ export default function Ledger({ cases, loading, error, selectedId, onSelect, on
         <div className="ledger-empty" role="status">Reading the ledger…</div>
       ) : !rows.length ? (
         <div className="ledger-empty">
-          <p>{scoped.length ? 'No case matches these filters. Change the mode filter to see stored replays.' : 'No cases are filed yet. Open a live case above and it will be filed here with a receipt.'}</p>
+          <p>{scoped.length ? 'No live case matches this desk.' : 'No cases are filed yet. Open a live case above and it will be filed here with a receipt.'}</p>
         </div>
       ) : (
         <div className="ledger-scroll">
           <table>
             <thead>
-              <tr><th>Filed</th><th>Desk</th><th>Subject</th><th>Mode</th><th>Verdict</th><th className="num">Credits</th><th>Receipt</th></tr>
+              <tr><th>Filed</th><th>Desk</th><th>Subject</th><th>Verdict</th><th className="num">Credits</th><th>Receipt</th></tr>
             </thead>
             <tbody>
               {rows.map(c => {
@@ -70,7 +62,6 @@ export default function Ledger({ cases, loading, error, selectedId, onSelect, on
                         {c.subject || 'Untitled case'}
                       </button>
                     </td>
-                    <td><span className={'pill ' + (isLive(c) ? 'tone-clear' : 'tone-sign')}>{modeLabel(c.mode)}</span></td>
                     <td><b className={'tone-' + verdictTone(c.verdict)}>{c.verdict}</b></td>
                     <td className="num mono">{formatCredits(c.credits)}</td>
                     <td className="mono dim">{shortDigest(c.receipt || '')}</td>

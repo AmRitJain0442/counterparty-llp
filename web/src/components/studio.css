@@ -31,7 +31,6 @@
 .field input, .field textarea, .field select { width: 100%; background: var(--raise); border: 1px solid var(--line-2); border-radius: 3px; padding: 11px 12px; color: var(--ink); resize: vertical; min-width: 0; }
 .field input::placeholder, .field textarea::placeholder { color: #6c6654; }
 .field input:focus, .field textarea:focus { outline: 2px solid var(--c); outline-offset: 0; border-color: transparent; }
-.demo-note { color: var(--ink-2); border-left: 3px solid var(--c); padding: 4px 0 4px 14px; font-size: .94rem; max-width: 52ch; }
 .consent { display: flex; gap: 10px; align-items: flex-start; font-size: .88rem; color: var(--ink-2); }
 .consent input { margin-top: 4px; accent-color: var(--hot); }
 .submit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
