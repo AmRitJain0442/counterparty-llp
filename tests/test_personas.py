@@ -1,5 +1,6 @@
 import re
-from backend import demo, personas, swarm
+import case_fixtures
+from backend import personas, swarm
 
 SPECS = [s for pid in personas.SPECIALISTS for s in personas.SPECIALISTS[pid]]
 PARENTS = {a['id'] for a in swarm.agents_for('payment') if not a['parent_id']}
@@ -16,9 +17,9 @@ def test_roster_is_complete_and_distinct():
     assert {s['id'] for s in SPECS} == set(personas._CHECKS)
 
 
-def test_demo_checks_cite_only_supplied_rows_for_every_case():
-    for desk in demo.CASES:
-        rows = demo.build_demo(desk)['evidence']
+def test_fixture_checks_cite_only_supplied_rows_for_every_case():
+    for desk in case_fixtures.CASES:
+        rows = case_fixtures.build_case(desk)['evidence']
         ids = {r['id'] for r in rows}
         for spec in SPECS:
             out = personas.check_specialist(spec, rows, [], 'HELD')
@@ -29,7 +30,7 @@ def test_demo_checks_cite_only_supplied_rows_for_every_case():
 
 
 def test_checks_differ_and_report_gaps():
-    rows = demo.build_demo('candidate')['evidence']
+    rows = case_fixtures.build_case('candidate')['evidence']
     notes = {s['id']: personas.check_specialist(s, rows, [], 'HELD')['note'] for s in SPECS}
     assert len(set(notes.values())) == len(notes)
     assert 'diverge' in notes['scope.quantity_reconciliation'] and '40' in notes['scope.quantity_reconciliation']
@@ -49,7 +50,7 @@ def test_no_false_corroboration_from_a_single_root_or_replay():
 
 
 def test_upstream_incomplete_blocks_a_ready_result():
-    rows = demo.build_demo('payment')['evidence']
+    rows = case_fixtures.build_case('payment')['evidence']
     blocked = [dict(agent_id='analyst_scope', name='Scope analyst', status='blocked', assessment=None, refs=[])]
     out = personas.check_specialist(personas.SPECIALISTS['challenger_scope'][1], rows, blocked, 'HELD')
     assert out['assessment'] == 'needs_evidence' and 'Scope analyst' in out['note']

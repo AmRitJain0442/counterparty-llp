@@ -128,13 +128,12 @@ def check_receipt(case_id: str):
 @app.post("/api/cases", status_code=201)
 def investigate(intake: Intake):
     subject = intake.subject.strip()
-    if intake.mode == "live" and not subject:
+    if not subject:
         raise HTTPException(422, "Enter a subject for this live inquiry")
-    if intake.mode == "live" and intake.desk == "candidate" and not intake.consent:
+    if intake.desk == "candidate" and not intake.consent:
         raise HTTPException(422, "Candidate consent is required")
-    if intake.mode == "live":
-        with progress.record_collection() as collections:
-            raw = collect_live(intake.desk, subject, intake.consent, intake.inputs)
+    with progress.record_collection() as collections:
+        raw = collect_live(intake.desk, subject, intake.consent, intake.inputs)
     progress.report("Opposing counsel", "running", "Checking evidence and alternative explanations")
     ruling = adjudicate(intake.desk, raw)
     case = {
@@ -171,25 +170,24 @@ def investigate(intake: Intake):
     leads = [report for report in reports if not report.get("parent_id")]
     case["steps"].extend({k: report[k] for k in ("name", "status", "detail")} for report in leads)
     by_id = {r["agent_id"]: r for r in reports}
-    if intake.mode == "live":
-        case["reviews"] = {"analyst": by_id["analyst_scope"], "counsel": by_id["challenger_scope"]}
-        partner = by_id["partner"]
-        if partner["status"] == "complete":
-            case["draft"] = partner["detail"]
-        flagged = [r for r in reports if r.get("assessment") == "needs_evidence" or r["status"] != "complete"]
-        case["council_decision"] = {
-            "proposed_verdict": ruling["verdict"],
-            "referred_by": [r["name"] for r in flagged if not r.get("parent_id")],
-            "specialist_referrals": [r["agent_id"] for r in flagged if r.get("parent_id")],
-            "disposition": "further review" if flagged else "review complete",
-        }
-        if flagged and ruling["verdict"] in {"HELD", "FORECAST FOR REVIEW", "REQUEST FOR EXPLANATION", "FAILED", "KILLED"}:
-            case["verdict"] = "PARTNER REVIEW"
-            case["summary"] = "The council referred the proposed finding for further evidence. Review the flagged agent reports before acting."
+    case["reviews"] = {"analyst": by_id["analyst_scope"], "counsel": by_id["challenger_scope"]}
+    partner = by_id["partner"]
+    if partner["status"] == "complete":
+        case["draft"] = partner["detail"]
+    flagged = [r for r in reports if r.get("assessment") == "needs_evidence" or r["status"] != "complete"]
+    case["council_decision"] = {
+        "proposed_verdict": ruling["verdict"],
+        "referred_by": [r["name"] for r in flagged if not r.get("parent_id")],
+        "specialist_referrals": [r["agent_id"] for r in flagged if r.get("parent_id")],
+        "disposition": "further review" if flagged else "review complete",
+    }
+    if flagged and ruling["verdict"] in {"HELD", "FORECAST FOR REVIEW", "REQUEST FOR EXPLANATION", "FAILED", "KILLED"}:
+        case["verdict"] = "PARTNER REVIEW"
+        case["summary"] = "The council referred the proposed finding for further evidence. Review the flagged agent reports before acting."
     progress.report("Ledger", "running", "Committing the evidence receipt")
     if raw.get("forecast"):
         case["forecast"] = raw["forecast"]
-    if intake.mode == "live" and case["verdict"] == "FORECAST FOR REVIEW" and os.getenv("REKOR_ENABLED") == "1":
+    if case["verdict"] == "FORECAST FOR REVIEW" and os.getenv("REKOR_ENABLED") == "1":
         signed = {**case, "verdict": "SIGNED"}
         try:
             receipt = create_receipt(signed, publish=True)

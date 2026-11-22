@@ -54,9 +54,8 @@ def run_council(desk, evidence, verdict, emit, mode, *, verdict_summary='', prop
     All runtime state belongs to this invocation. Live model failures remain visible
     and block downstream model work rather than producing synthetic live notes.
     """
-    if mode not in ('demo', 'live', 'replay'):
-        raise ValueError('mode must be demo, replay, or live')
-    replay = mode != 'live'
+    if mode != 'live':
+        raise ValueError('Only live investigations can be executed')
     rows = [dict(row) for row in evidence if row.get('id')]
     material = [r for r in rows if r.get('status', 'ok') in ('ok', 'complete') and (r.get('detail') or r.get('label'))]
     reports = {}
@@ -84,11 +83,6 @@ def run_council(desk, evidence, verdict, emit, mode, *, verdict_summary='', prop
             upstream = [reports[d] for d in deps] + [reports[c] for c in agent["specialist_ids"]]
             if any(r['status'] != 'complete' for r in upstream):
                 detail, status = 'Required council output unavailable; review blocked.', 'blocked'
-            elif replay:
-                observations = '; '.join(str(r.get('detail') or r.get('label'))[:400] for r in selected)
-                detail = f'{agent["task"]}. Curated observations: {observations}. '
-                detail += 'Reviewed inputs from ' + ', '.join(agents[d]['name'] for d in deps) + '.'
-                assessment = 'rehearsal'
             else:
                 dependencies = [dict(label=f'Dependency {r["agent_id"]}', detail=f"{r.get('assessment') or 'Observation'}: {r['detail']}",
                                  source=', '.join(r['refs'])) for r in upstream]
@@ -122,7 +116,7 @@ def run_council(desk, evidence, verdict, emit, mode, *, verdict_summary='', prop
             detail = f'{agent["task"]}: {len(selected)} observations; sources: ' + ', '.join(
                 dict.fromkeys(str(r.get('source', 'unknown')) for r in selected))
         children = [reports[c] for c in agent['specialist_ids']]
-        if not synthesizes or replay:
+        if not synthesizes:
             detail += ' Specialist observations: ' + ' '.join(
                 f"{child['name']}: {child['detail']}" for child in children)
             refs = list(dict.fromkeys(refs + [ref for c in children for ref in c['refs']]))
@@ -138,7 +132,7 @@ def run_council(desk, evidence, verdict, emit, mode, *, verdict_summary='', prop
         emit(dict(event=kind, agent_id=agent['id'], name=agent['name'], group=agent['group'],
                   depends_on=agent['depends_on'], parent_id=agent['parent_id'],
                   persona=agent['persona'], specialist_ids=agent['specialist_ids'],
-                  mode='replay' if replay else 'live', replay=replay, **extra))
+                  mode='live', replay=False, **extra))
 
     def failure(agent, exc):
         return dict(agent_id=agent['id'], name=agent['name'], group=agent['group'],
@@ -152,7 +146,7 @@ def run_council(desk, evidence, verdict, emit, mode, *, verdict_summary='', prop
         event('start', agent, detail=agent['task'], status='running')
         try:
             upstream = [reports[d] for d in agent['depends_on']]
-            if replay or agent['id'] == 'dates.sequence':
+            if agent['id'] == 'dates.sequence':
                 review = check_specialist(spec, rows, upstream, verdict)
                 status = 'complete'
             else:

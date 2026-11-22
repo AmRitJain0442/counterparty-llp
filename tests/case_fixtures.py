@@ -1,4 +1,4 @@
-"""Curated synthetic cases for the four-desk stage rehearsal."""
+"""Offline provider inputs for the four investigation desk tests."""
 
 DAY = "2026-11-22"
 CASES = {
@@ -22,14 +22,14 @@ CASES = {
         ("Crustdata", "Finance leadership transition", "A dated finance leadership change appears in the reconstructed workforce record."),
         ("EDGAR", "Officer-change filing", "A synthetic Item 5.02 filing independently records the same transition."),
         ("Watch replay", "Earlier watch observation", "A replayed observation places the profile movement before the simulated filing.")
-    ], "Rehearsal forecast: check the next quarterly filing for a permanent finance appointment. The demo receipt is local.")
+    ], "Rehearsal forecast: check the next quarterly filing for a permanent finance appointment. The test receipt is local.")
 }
 
 
-def build_demo(desk):
+def build_case(desk):
     name, claim, rows, explanation = CASES[desk]
     cards = [{"id": f"exhibit-{i+1}", "source": source, "label": label, "detail": detail,
-              "as_of": DAY, "mode": "REPLAY" if source == "Watch replay" else "DEMO", "url": None,
+              "as_of": DAY, "mode": "REPLAY" if source == "Watch replay" else "FIXTURE", "url": None,
               "claim": claim if i < 2 else None} for i, (source, label, detail) in enumerate(rows)]
     signals = [{"type": "claim_observation", "evidence_id": row["id"], "claim": claim} for row in cards[:2]]
     if desk == "estate":
@@ -37,7 +37,7 @@ def build_demo(desk):
     flows = [{"from":name,"to":dest,"count":n} for dest,n in (
         ("Sundvik Holding",32),("Fjord Service",19),("Kyst Engineering",15),("Unknown or suppressed",18)
     )] if desk == "estate" else []
-    return {"subject":name, "mode":"demo", "as_of":DAY, "evidence":cards, "signals":signals,
+    return {"subject":name, "mode":"fixture", "as_of":DAY, "evidence":cards, "signals":signals,
             "steps":[{"name":stage,"status":"complete","detail":note} for stage,note in [
                 ("Identity", "Synthetic identities resolved for this exhibit."),
                 ("Evidence desk", f"{len(cards)} dated exhibits examined."),

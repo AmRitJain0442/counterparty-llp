@@ -1,20 +1,7 @@
 """Apply deterministic claim-level evidence gates before a partner finding."""
-from .demo import CASES
 
 
 def adjudicate(desk, raw):
-    if raw.get("mode") == "demo":
-        claim = raw.get("proposition")
-        rows = {c["id"]: c for c in raw.get("evidence", []) if c.get("claim") == claim}
-        cited = {s.get("evidence_id") for s in raw.get("signals", [])
-                 if s.get("type") == "claim_observation" and s.get("claim") == claim}
-        witnesses = {rows[i]["source"] for i in cited if i in rows}
-        if "Crustdata" in witnesses and len(witnesses) >= 2:
-            killed = any(s.get("type") == "predates_filing" and s.get("evidence_id") in rows
-                         for s in raw["signals"])
-            verdicts = {"payment":"HELD", "candidate":"FAILED", "estate":"KILLED" if killed else "REQUEST FOR EXPLANATION",
-                        "company":"SIGNED"}
-            return {"verdict":verdicts[desk], "summary":CASES[desk][3]}
     claim = raw.get("proposition")
     if desk == "payment" and claim:
         cited = {s.get("evidence_id") for s in raw.get("signals", []) if

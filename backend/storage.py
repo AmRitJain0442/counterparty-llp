@@ -193,7 +193,8 @@ def list_cases() -> list[dict]:
 
 def get_case(id: str) -> dict | None:
     doc = _ledger().get("cases", _case_key(id))
-    return _decision(doc) if doc and _decision(doc).get("mode") == "live" else None
+    case = _decision(doc) if doc else None
+    return case if case and case.get("mode") == "live" else None
 
 
 def attach_receipt(case: dict, receipt: dict) -> None:

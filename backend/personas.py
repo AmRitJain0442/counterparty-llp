@@ -241,7 +241,7 @@ def _asof(row):
 
 
 def _is_rehearsal(row):
-    return str(row.get('mode', '')).upper() in ('DEMO', 'REPLAY') or 'replay' in str(row.get('source', '')).lower()
+    return str(row.get('mode', '')).upper() in ('FIXTURE', 'REPLAY') or 'replay' in str(row.get('source', '')).lower()
 
 
 def _root(row):
@@ -699,7 +699,7 @@ def _handoff_open(rows, up, verdict):
         items.append('open upstream: ' + _short([u.get('name') or u.get('agent_id') for u in open_]))
         refs += [ref for u in open_ for ref in u.get('refs', [])]
     mode = {str(r.get('mode', '')).upper() for r in _material(rows)}
-    rehearsal = mode & {'DEMO', 'REPLAY'}
+    rehearsal = mode & {'FIXTURE', 'REPLAY'}
     if rehearsal:
         items.append('exhibits are ' + '/'.join(sorted(rehearsal)) + ' material, not live records')
     refs = refs or _ids(_material(rows)[:1])

@@ -9,16 +9,16 @@ from backend import main
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    from backend.demo import build_demo
+    from case_fixtures import build_case
     from backend import swarm
-    monkeypatch.setattr(main, "collect_live", lambda desk, *args: build_demo(desk))
+    monkeypatch.setattr(main, "collect_live", lambda desk, *args: build_case(desk))
     monkeypatch.setattr(swarm, "draft_note", lambda *args, **kwargs: ({"note": "Offline review", "assessment": "ready", "refs": []}, "complete"))
     monkeypatch.setenv("SQLITE_PATH", str(tmp_path / "ledger.sqlite3"))
     monkeypatch.setenv("LEDGER_BACKEND", "sqlite")
     return TestClient(main.app)
 
 
-@pytest.mark.parametrize("mode", ["demo", "replay", "synthetic"])
+@pytest.mark.parametrize("mode", ["fixture", "replay", "synthetic"])
 @pytest.mark.parametrize("route", ["/api/cases", "/api/cases/stream"])
 def test_obsolete_mode_rejected_before_collection(client, monkeypatch, mode, route):
     monkeypatch.setattr(main, "collect_live", lambda *args: pytest.fail("provider invoked"))
@@ -45,7 +45,7 @@ def test_stream_completes_with_persisted_case(client):
 
 
 def test_browser_input_cannot_select_provider_calls(client):
-    request = {"desk": "company", "mode": "live", "subject": "Demo", "inputs": {"watch_confirmed": "true"}}
+    request = {"desk": "company", "mode": "live", "subject": "Example", "inputs": {"watch_confirmed": "true"}}
     assert client.post("/api/cases", json=request).status_code == 422
 
 
@@ -112,7 +112,7 @@ def test_specialist_concern_reaches_the_filed_decision(client, monkeypatch):
 
 def test_old_cases_hidden_without_deleting_records(client):
     from backend import storage
-    storage.save_case({"id": "old", "mode": "demo"})
+    storage.save_case({"id": "old", "mode": "fixture"})
     assert client.get("/api/cases").json() == []
     for suffix in ("", "/receipt", "/reviews"):
         assert client.get("/api/cases/old" + suffix).status_code == 404

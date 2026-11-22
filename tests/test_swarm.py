@@ -4,15 +4,16 @@ from backend import swarm
 ROWS = [dict(id='e1', label='Claim', detail='Dated observation', source='Registry', as_of='2026-01-01')]
 
 
-def test_roster_and_replay_dependencies():
+def test_roster_and_live_dependencies(monkeypatch):
+    monkeypatch.setattr(swarm, 'draft_note', lambda *a, **kw: ({'note': 'Reviewed.', 'assessment': 'ready', 'refs': ['e1']}, 'complete'))
     agents = swarm.agents_for('payment')
     assert len(agents) == len({a['id'] for a in agents}) == 36
     assert set(a['group'] for a in agents) == {'identity', 'discovery', 'challenge', 'decision'}
     events = []
-    reports = swarm.run_council('payment', ROWS, 'HELD', events.append, 'demo')
+    reports = swarm.run_council('payment', ROWS, 'HELD', events.append, 'live')
     ended = set()
     for event in events:
-        assert event['replay'] and event['mode'] == 'replay'
+        assert not event['replay'] and event['mode'] == 'live'
         assert set(event['depends_on']) <= ended
         if event['event'] == 'end':
             ended.add(event['agent_id'])
